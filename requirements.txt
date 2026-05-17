@@ -1,0 +1,49 @@
+# ============================================================
+# Causal Recourse + Algorithmic Fairness — Project Dependencies
+# Python >= 3.10
+# ============================================================
+
+# ── Core ML / Deep Learning ──────────────────────────────────
+# Install PyTorch separately via pytorch.org to match your CUDA version.
+# CPU-only:   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# CUDA 12.1:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# CUDA 12.6:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+torch>=2.1.0
+torchvision>=0.16.0
+
+# ── Normalizing Flows ────────────────────────────────────────
+nflows==0.14                   # bayesiains/nflows — MAF, Neural Spline Flows
+
+# ── Scientific Computing ─────────────────────────────────────
+numpy>=1.26.0,<3.0
+pandas>=2.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# ── Optimization (MILP recourse) ─────────────────────────────
+pyomo>=6.7.0                   # modelling layer
+highspy>=1.7.0                 # HiGHS solver backend (AppsiHighs)
+
+# ── Configuration Management ─────────────────────────────────
+hydra-core>=1.3.0
+omegaconf>=2.3.0
+
+# ── Experiment Tracking ──────────────────────────────────────
+wandb>=0.16.0
+
+# ── Causal Inference / Recourse Baselines ────────────────────
+dice-ml>=0.11                  # DiCE counterfactual baseline
+dowhy>=0.11                    # causal reasoning utilities
+
+# ── Notebooks & Visualization ────────────────────────────────
+jupyter>=1.0.0
+notebook>=7.0.0
+ipykernel>=6.25.0
+matplotlib>=3.7.0
+seaborn>=0.13.0
+plotly>=5.18.0
+
+# ── Data & Utilities ─────────────────────────────────────────
+tqdm>=4.66.0
+joblib>=1.3.0
+pyyaml>=6.0

@@ -1,0 +1,20 @@
+# Raw ACS / law-school data files (large, not versioned)
+data/
+
+# Regenerable binary artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Preprocessed tensors — regenerable from data/
+outputs/data/
+
+# Candidate caches — regenerable from sweep script
+outputs/recourse/*.pkl
+
+# Python tooling
+.venv/
+*.egg-info/
+dist/
+build/
+.env
