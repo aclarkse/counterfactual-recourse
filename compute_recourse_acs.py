@@ -108,7 +108,7 @@ def precompute_candidates_batch(pipe, scaler, xi, zi, wdi, wci,
     Returns
     -------
     list[dict] — one dict per candidate with keys:
-        cost, shortfall, delta_schl, occ_change, delta_wkhp
+        cost, shortfall, p_xi, p_xcf, delta_schl, occ_change, delta_wkhp
     """
     n_schl     = vocab["SCHL_GRP"]
     n_occp     = vocab["OCCP_GRP"]
@@ -180,6 +180,8 @@ def precompute_candidates_batch(pipe, scaler, xi, zi, wdi, wci,
         {
             "cost":       float(cost_col[i]),
             "shortfall":  float(sf[i]),
+            "p_xi":       float(p_xi[i]),
+            "p_xcf":      float(p_xcf[i]),
             "delta_schl": int(ds_col[i]),
             "occ_change": int(oc_col[i]),
             "delta_wkhp": float(dw_col[i]),
@@ -233,8 +235,14 @@ def run_recourse_batch(pipe, scaler, data, vocab, weights,
             Wd_va[i].unsqueeze(0), Wc_va[i].unsqueeze(0),
             vocab, weights, threshold, nu,
         )
-        best        = select_best(cands, eta)
-        best["sex"] = int(X_va[i, 0].item())
+        best         = select_best(cands, eta)
+        sex          = int(X_va[i, 0].item())
+        best["sex"]  = sex
+        # Post-recourse NIE: signed gender gap at the recourse solution w'
+        # p_male - p_female evaluated at w'_i (always Male minus Female)
+        p_male   = best["p_xcf"] if sex == 0 else best["p_xi"]
+        p_female = best["p_xi"]  if sex == 0 else best["p_xcf"]
+        best["nie_post"] = float(p_male - p_female)
         results.append(best)
 
         if (k + 1) % 50 == 0 or (k + 1) == len(tn_idx):
@@ -276,7 +284,8 @@ def aggregate(results: list[dict], n_boot: int = 1000) -> dict:
         nan3 = (float("nan"),) * 3
         return {"n": 0, "n_feasible": 0, "feasible_rate": nan3,
                 "delta_schl": nan3, "occ_change": nan3,
-                "delta_wkhp": nan3, "cost": nan3, "shortfall": nan3}
+                "delta_wkhp": nan3, "cost": nan3, "shortfall": nan3,
+                "nie_post": nan3}
 
     rng    = np.random.default_rng(0)
     feas   = np.array([float(r["shortfall"] == 0.0) for r in results])
@@ -285,6 +294,7 @@ def aggregate(results: list[dict], n_boot: int = 1000) -> dict:
     d_wkhp = np.array([r["delta_wkhp"] for r in results], dtype=float)
     d_cost = np.array([r["cost"]       for r in results], dtype=float)
     d_sf   = np.array([r["shortfall"]  for r in results], dtype=float)
+    d_nie  = np.array([r["nie_post"]   for r in results], dtype=float)
 
     return {
         "n":             n,
@@ -295,6 +305,7 @@ def aggregate(results: list[dict], n_boot: int = 1000) -> dict:
         "delta_wkhp":    _bootstrap_ci(d_wkhp, n_boot, rng=rng),
         "cost":          _bootstrap_ci(d_cost, n_boot, rng=rng),
         "shortfall":     _bootstrap_ci(d_sf,   n_boot, rng=rng),
+        "nie_post":      _bootstrap_ci(d_nie,  n_boot, rng=rng),
     }
 
 
@@ -327,11 +338,11 @@ def make_recourse_table(all_stats: dict, model_names: list[str],
         f"  \\caption{{{caption}}}",
         f"  \\label{{{label}}}",
         r"  \setlength{\tabcolsep}{4pt}",
-        r"  \begin{tabular}{llccccccc}",
+        r"  \begin{tabular}{llcccccccc}",
         r"    \toprule",
         r"    Model & Group & $n_{\mathrm{TN}}$ & Feasible ($S{=}0$) & "
         r"$\Delta\mathrm{Edu}$ & Occ.\ change & $\Delta\mathrm{WKHP}$ (h/wk)"
-        r" & Cost & Shortfall $S$ \\",
+        r" & Cost & Shortfall $S$ & $\mathrm{NIE}_{\mathrm{post}}$ \\",
         r"    \midrule",
     ]
     for mi, name in enumerate(model_names):
@@ -352,7 +363,8 @@ def make_recourse_table(all_stats: dict, model_names: list[str],
                 f"{_pct_cell(*s['occ_change'])} & "
                 f"{_ci_cell(*s['delta_wkhp'], fmt='.1f')} & "
                 f"{_ci_cell(*s['cost'], fmt='.3f')} & "
-                f"{_ci_cell(*s['shortfall'], fmt='.4f')} \\\\"
+                f"{_ci_cell(*s['shortfall'], fmt='.4f')} & "
+                f"{_ci_cell(*s['nie_post'], fmt='.4f')} \\\\"
             )
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table}"]
     return "\n".join(lines)
@@ -379,7 +391,8 @@ def print_summary(all_stats: dict, model_names: list[str]) -> str:
                 f"occ%={100*s['occ_change'][0]:.1f}  "
                 f"Δwkhp={s['delta_wkhp'][0]:.1f}  "
                 f"cost={s['cost'][0]:.3f}  "
-                f"shortfall={s['shortfall'][0]:.4f}"
+                f"shortfall={s['shortfall'][0]:.4f}  "
+                f"NIE_post={s['nie_post'][0]:+.4f}"
             )
             print(row)
             lines.append(row)

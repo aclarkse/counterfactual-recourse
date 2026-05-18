@@ -411,6 +411,7 @@ def _precompute_one_torch(torch_pipe, scaler, xi, zi, wdi, wci,
 
     return [
         {"cost": float(cost_col[i]), "shortfall": float(sf[i]),
+         "p_xi": float(p_xi[i]), "p_xcf": float(p_xcf[i]),
          "delta_schl": int(ds_col[i]), "occ_change": int(oc_col[i]),
          "delta_wkhp": float(dw_col[i])}
         for i in range(n)
@@ -446,10 +447,14 @@ def precompute_all_tn(torch_pipe, scaler, data, vocab, weights,
     if use_cache and os.path.exists(cache_file):
         print(f"  Loading candidate cache: {cache_file}")
         all_candidates, sex_labels = _load_cache(cache_file)
-        n_cands = len(all_candidates[0]) if all_candidates else 0
-        print(f"  Loaded {len(all_candidates)} individuals, "
-              f"{n_cands} candidates each")
-        return all_candidates, sex_labels
+        sample = all_candidates[0][0] if all_candidates else {}
+        if "p_xi" not in sample:
+            print("  Cache missing p_xi/p_xcf (old format) — recomputing.")
+        else:
+            n_cands = len(all_candidates[0]) if all_candidates else 0
+            print(f"  Loaded {len(all_candidates)} individuals, "
+                  f"{n_cands} candidates each")
+            return all_candidates, sex_labels
 
     # Identify true negatives
     X_va  = data["X_va"]
@@ -532,6 +537,8 @@ def precompute_all_tn(torch_pipe, scaler, data, vocab, weights,
             {
                 "cost":       float(c[j]),
                 "shortfall":  float(sf[start + j]),
+                "p_xi":       float(p_xi[start + j]),
+                "p_xcf":      float(p_xcf[start + j]),
                 "delta_schl": int(ds[j]),
                 "occ_change": int(oc[j]),
                 "delta_wkhp": float(dw[j]),
@@ -550,10 +557,17 @@ def precompute_all_tn(torch_pipe, scaler, data, vocab, weights,
 def run_sweep(all_candidates: list, sex_labels: list,
               lambda_grid: list[float]) -> list[list[dict]]:
     """Re-rank cached candidates at each λ — zero additional model calls."""
-    return [
-        [select_best(cands, eta) for cands in all_candidates]
-        for eta in lambda_grid
-    ]
+    results = []
+    for eta in lambda_grid:
+        per_lambda = []
+        for cands, sex in zip(all_candidates, sex_labels):
+            best     = dict(select_best(cands, eta))   # shallow copy
+            p_male   = best["p_xcf"] if sex == 0 else best["p_xi"]
+            p_female = best["p_xi"]  if sex == 0 else best["p_xcf"]
+            best["nie_post"] = float(p_male - p_female)
+            per_lambda.append(best)
+        results.append(per_lambda)
+    return results
 
 
 # ── Aggregation ───────────────────────────────────────────────────────────────
@@ -562,7 +576,8 @@ def _agg(records: list[dict], n_boot: int, rng) -> dict:
     if not records:
         nan3 = (float("nan"),) * 3
         return dict(n=0, feasible_rate=nan3, delta_schl=nan3,
-                    occ_change=nan3, delta_wkhp=nan3, cost=nan3, shortfall=nan3)
+                    occ_change=nan3, delta_wkhp=nan3, cost=nan3, shortfall=nan3,
+                    nie_post=nan3)
 
     feas   = np.array([float(r["shortfall"] == 0.0) for r in records])
     d_schl = np.array([r["delta_schl"] for r in records], dtype=float)
@@ -570,6 +585,7 @@ def _agg(records: list[dict], n_boot: int, rng) -> dict:
     d_wkhp = np.array([r["delta_wkhp"] for r in records], dtype=float)
     d_cost = np.array([r["cost"]       for r in records], dtype=float)
     d_sf   = np.array([r["shortfall"]  for r in records], dtype=float)
+    d_nie  = np.array([r["nie_post"]   for r in records], dtype=float)
 
     return {
         "n":             len(records),
@@ -579,6 +595,7 @@ def _agg(records: list[dict], n_boot: int, rng) -> dict:
         "delta_wkhp":    _bootstrap_ci(d_wkhp, n_boot, rng=rng),
         "cost":          _bootstrap_ci(d_cost, n_boot, rng=rng),
         "shortfall":     _bootstrap_ci(d_sf,   n_boot, rng=rng),
+        "nie_post":      _bootstrap_ci(d_nie,  n_boot, rng=rng),
     }
 
 
@@ -634,10 +651,11 @@ def make_sweep_table(agg: dict, lambda_grid: list[float], leb: float,
         f"  \\caption{{{caption}}}",
         f"  \\label{{{label}}}",
         r"  \setlength{\tabcolsep}{4pt}",
-        r"  \begin{tabular}{lccccccc}",
+        r"  \begin{tabular}{lcccccccc}",
         r"    \toprule",
         r"    $\lambda$ & $n_{\mathrm{TN}}$ & Feasible ($S{=}0$) "
-        r"& $\Delta\mathrm{Edu}$ & Occ.\ chg & $\Delta\mathrm{WKHP}$ & Cost & Shortfall $S$ \\",
+        r"& $\Delta\mathrm{Edu}$ & Occ.\ chg & $\Delta\mathrm{WKHP}$ & Cost & Shortfall $S$"
+        r" & $\mathrm{NIE}_{\mathrm{post}}$ \\",
         r"    \midrule",
     ]
     for eta, row in zip(lambda_grid, rows):
@@ -649,7 +667,8 @@ def make_sweep_table(agg: dict, lambda_grid: list[float], leb: float,
             f"{_pct(*row['occ_change'])} & "
             f"{_ci(*row['delta_wkhp'], fmt='.1f')} & "
             f"{_ci(*row['cost'])} & "
-            f"{_ci(*row['shortfall'], fmt='.4f')} \\\\"
+            f"{_ci(*row['shortfall'], fmt='.4f')} & "
+            f"{_ci(*row['nie_post'], fmt='.4f')} \\\\"
         )
         if eta > 0 and eta < INF_ETA / 2 and abs(eta / leb - 1.0) < 0.01:
             lines.append(r"    \midrule")
@@ -745,7 +764,7 @@ def main(args):
         print(hdr)
         txt_lines.append(hdr)
         col_hdr = (f"  {'λ':>16s}  {'Feasible':>9}  {'ΔEdu':>6}  "
-                   f"{'Occ%':>6}  {'ΔWKHP':>7}  {'Cost':>7}  {'Shortfall':>10}")
+                   f"{'Occ%':>6}  {'ΔWKHP':>7}  {'Cost':>7}  {'Shortfall':>10}  {'NIE_post':>9}")
         print(col_hdr)
         txt_lines.append(col_hdr)
 
@@ -758,7 +777,8 @@ def main(args):
                 f"{100*row['occ_change'][0]:5.1f}%  "
                 f"{row['delta_wkhp'][0]:7.2f}  "
                 f"{row['cost'][0]:7.4f}  "
-                f"{row['shortfall'][0]:10.5f}"
+                f"{row['shortfall'][0]:10.5f}  "
+                f"{row['nie_post'][0]:+9.4f}"
             )
             print(row_str)
             txt_lines.append(row_str)
