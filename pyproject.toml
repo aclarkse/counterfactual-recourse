@@ -32,6 +32,9 @@ dependencies = [
     "folktables>=0.0.12",
 ]
 
+[tool.setuptools.packages.find]
+include = ["data*", "flows*", "outcome*", "evaluation*"]
+
 [tool.uv]
 # PyTorch is excluded here because the install URL depends on your CUDA version.
 # It is installed separately in the setup instructions below.
