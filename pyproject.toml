@@ -40,9 +40,10 @@ include = ["data*", "flows*", "outcome*", "evaluation*"]
 # It is installed separately in the setup instructions below.
 
 [tool.uv.sources]
-# Uncomment one of these to pin PyTorch to a specific index:
-torch = { index = "pytorch-cu126" }
-torchvision = { index = "pytorch-cu126" }
+# Pin PyTorch to a CUDA build. cu128 ships sm_120 kernels required by
+# Blackwell GPUs (RTX 50-series); older indices (cu126) do not.
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -62,4 +63,9 @@ explicit = true
 [[tool.uv.index]]
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true

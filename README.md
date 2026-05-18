@@ -16,15 +16,16 @@ The repository illustrates the use of this pipeline on two datasets:
 ## Installation
 
 ```bash
-# Create the virtual environment and install dependencies (CPU)
-uv venv
-uv pip install -e .
-
-# Or with CUDA 12.6
-uv venv
-uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
-uv pip install -e .
+# Install all dependencies. PyTorch is pinned to a CUDA 12.8 build in
+# pyproject.toml / uv.lock — cu128 ships the sm_120 kernels required by
+# Blackwell / RTX 50-series GPUs (e.g. RTX 5090).
+uv sync
 ```
+
+> Need a different CUDA build or a CPU-only install? Repoint `torch`/`torchvision`
+> in `[tool.uv.sources]` (`pyproject.toml`) to another `pytorch-*` index — e.g.
+> `pytorch-cpu` or `pytorch-cu126` — then re-run `uv lock && uv sync`. Run
+> `nvidia-smi` to check your driver's CUDA version.
 
 All commands below are prefixed with `uv run`, which executes them inside the
 uv-managed environment — you do **not** need to activate the venv first. (If you

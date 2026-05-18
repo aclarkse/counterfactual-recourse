@@ -3,20 +3,19 @@
 ## One-time setup
 
 ```powershell
-# 1. Create the environment and install all dependencies
+# 1. Create the environment and install all dependencies, including a
+#    CUDA 12.8 PyTorch build (pinned in pyproject.toml / uv.lock). cu128
+#    ships the sm_120 kernels required by Blackwell / RTX 50-series GPUs.
 uv sync
 
-# 2. Install PyTorch — pick ONE of these based on your GPU:
-uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu      # no GPU
-uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121    # CUDA 12.1
-uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124    # CUDA 12.4
-
-# Not sure which CUDA version? Run:
-nvidia-smi
-
-# 3. Register the Jupyter kernel so it appears in VS Code / Jupyter
+# 2. Register the Jupyter kernel so it appears in VS Code / Jupyter
 uv run python -m ipykernel install --user --name causal-recourse --display-name "Python (causal-recourse)"
 ```
+
+> Need a different CUDA build or a CPU-only install? Repoint `torch`/`torchvision`
+> in `[tool.uv.sources]` (`pyproject.toml`) to another `pytorch-*` index — e.g.
+> `pytorch-cpu` or `pytorch-cu126` — then re-run `uv lock && uv sync`. Run
+> `nvidia-smi` to check your driver's CUDA version.
 
 ## Every time you work
 
