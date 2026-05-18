@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
 # Re-export for backward compat
 from data.build_tensors import stack_sfm_features  # noqa: F401
@@ -75,7 +75,14 @@ class _SFMPreprocess(nn.Module):
             if tr_name == "remainder":
                 continue
             cols = list(cols)
-            if isinstance(transformer, str) and transformer == "passthrough":
+            # A fitted ColumnTransformer materializes the "passthrough" string
+            # into an identity FunctionTransformer (func is None), so handle both.
+            is_passthrough = (
+                (isinstance(transformer, str) and transformer == "passthrough")
+                or (isinstance(transformer, FunctionTransformer)
+                    and transformer.func is None)
+            )
+            if is_passthrough:
                 self.plan.append(("pass", cols))
                 self.output_dim += len(cols)
             elif hasattr(transformer, "mean_"):   # StandardScaler
