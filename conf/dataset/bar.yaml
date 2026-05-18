@@ -1,0 +1,79 @@
+name: bar
+
+loader:
+  module: data.bar
+  fn: load_bar_data
+  kwargs:
+    path: data/bar.csv
+
+sfm:
+  sensitive: [race]
+  confounders: [gender, fam_inc]
+  mediators_disc: []
+  mediators_cont: [lsat, gpa]
+  outcome: bar_pass
+
+wc_clip: null
+
+flow:
+  hidden_dim: 64
+  n_layers: 2
+  embed_dim: 4
+  hidden_features: 64
+  n_flow_layers: 4
+  n_blocks: 2
+  num_bins: 8
+  tail_bound: 3.0
+  batch_size: 256
+  max_epochs: 100
+  lr: 0.001
+  patience: 10
+
+outcome:
+  col_types:
+    X: [passthrough]
+    Z: [passthrough, passthrough]
+    Wd: []
+    Wc: [scale, scale]
+  models:
+    - name: "Logistic Reg."
+      type: logreg
+      C: 1.0
+      max_iter: 1000
+    - name: "MLP (64--32)"
+      type: mlp
+      hidden_layer_sizes: [64, 32]
+      max_iter: 500
+
+gap:
+  K: 500
+  n_inst: 500
+  n_boot: 2000
+
+recourse:
+  threshold: 0.5
+  nu: 0.05
+  n_max: 0
+  n_boot: 1000
+  sweep_n_max: 250
+  mediators:
+    lsat:
+      display: "$\\Delta\\mathrm{LSAT}$"
+      type: continuous
+      actionable: monotone_up
+      clip: [120.0, 180.0]
+      step: 1.0
+    gpa:
+      display: "$\\Delta\\mathrm{GPA}$"
+      type: continuous
+      actionable: monotone_up
+      clip: [0.0, 4.0]
+      step: 0.05
+
+paths:
+  tensors: outputs/data/bar_tensors.pt
+  flows: outputs/flows/law_school/flow_models.pt
+  outcome_dir: outputs/outcome/bar
+  gaps_dir: outputs/gaps
+  recourse_dir: outputs/recourse
+  figures_dir: figures/law_school

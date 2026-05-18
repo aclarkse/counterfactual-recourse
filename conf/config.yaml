@@ -1,0 +1,11 @@
+defaults:
+  - dataset: acs
+  - _self_
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job_logging:
+    root:
+      level: WARNING
