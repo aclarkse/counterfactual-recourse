@@ -436,10 +436,6 @@ def main(cfg):
     print(f"Saved → {path_st}")
     print(f"Saved → {path_txt}")
     print(f"Saved → {path_json}")
-    print("\n── Overall table ──────────────────────────────────────────")
-    print(tex_overall)
-    print("\n── Stratified table ───────────────────────────────────────")
-    print(tex_strat)
 
 
 if __name__ == "__main__":
