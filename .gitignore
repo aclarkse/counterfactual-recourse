@@ -19,6 +19,13 @@ outputs/data/
 # Candidate caches — regenerable from sweep script
 outputs/recourse/*.pkl
 
+# Trained model artifacts — regenerable from the pipeline
+outputs/**/*.pt
+outputs/**/*.joblib
+
+# Run logs
+*.log
+
 # Python tooling
 .venv/
 *.egg-info/
