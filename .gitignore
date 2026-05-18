@@ -1,5 +1,12 @@
 # Raw ACS / law-school data files (large, not versioned)
-data/
+data/acs/
+data/atherosclerosis.*
+data/*.csv
+data/*.xls
+# Keep data/*.py (the Python data-loading package)
+
+# Hydra run outputs
+.hydra/
 
 # Regenerable binary artifacts
 __pycache__/

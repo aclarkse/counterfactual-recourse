@@ -1,5 +1,5 @@
 """
-data_acs.py — ACSIncome (Folktables) data loading for causal recourse
+data/acs.py — ACSIncome (Folktables) data loading for causal recourse
 
 SFM role assignment
 -------------------
@@ -72,7 +72,7 @@ def _bucket_occp(s: pd.Series) -> pd.Series:
 
 def load_acs_income(
     year: int = 2018,
-    states: list[str] = None,   # None = all 50 states + DC (pooled)
+    states: list = None,   # None = all 50 states + DC (pooled)
     survey: str = "person",
     threshold: float = 50_000,
     random_state: int = 42,
