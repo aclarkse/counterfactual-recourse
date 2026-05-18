@@ -16,21 +16,23 @@ The repository illustrates the use of this pipeline on two datasets:
 ## Installation
 
 ```bash
-# Create and activate a virtual environment (uv recommended)
-uv venv && source .venv/bin/activate   # Linux/macOS
-uv venv && .venv\Scripts\activate      # Windows
-
-# Install dependencies (CPU)
+# Create the virtual environment and install dependencies (CPU)
+uv venv
 uv pip install -e .
 
 # Or with CUDA 12.6
+uv venv
 uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 uv pip install -e .
 ```
 
+All commands below are prefixed with `uv run`, which executes them inside the
+uv-managed environment — you do **not** need to activate the venv first. (If you
+prefer, you can `source .venv/bin/activate` once and drop the `uv run` prefix.)
+
 ## Pipeline
 
-The implementation is organised as a five-stage pipeline. All entry points are run as Python modules from the project root and are driven by [Hydra](https://hydra.cc/) configs in `conf/dataset/`. Switch datasets by passing `dataset=bar` instead of the default `dataset=acs`.
+The implementation is organised as a five-stage pipeline. All entry points are run as Python modules from the project root via `uv run` and are driven by [Hydra](https://hydra.cc/) configs in `conf/dataset/`. Switch datasets by passing `dataset=bar` instead of the default `dataset=acs`.
 
 ### Stage 1 — Flow training: $\Pr(W \mid X, Z)$
 
@@ -41,10 +43,10 @@ $$\Pr(W \mid X, Z) = \Pr(W_d \mid X, Z) \cdot \Pr(W_c \mid W_d, X, Z)$$
 with a categorical MLP head for discrete mediators and a Neural Spline Flow for the continuous component.
 
 ```bash
-python -m flows.train_flow                        # ACS (default)
-python -m flows.train_flow dataset=bar            # Law School
-python -m flows.train_flow dataset=acs dataset.loader.kwargs.year=2019
-python -m flows.train_flow dataset=acs dataset.flow.max_epochs=200
+uv run python -m flows.train_flow                        # ACS (default)
+uv run python -m flows.train_flow dataset=bar            # Law School
+uv run python -m flows.train_flow dataset=acs dataset.loader.kwargs.year=2019
+uv run python -m flows.train_flow dataset=acs dataset.flow.max_epochs=200
 ```
 
 **Outputs:** `outputs/flows/{acs,law_school}/flow_models.pt`, `outputs/data/{acs,bar}_tensors.pt`
@@ -56,8 +58,8 @@ python -m flows.train_flow dataset=acs dataset.flow.max_epochs=200
 Fits two outcome models (logistic regression and MLP) on the training split and evaluates them on the validation split, stratified by the sensitive attribute.
 
 ```bash
-python -m outcome.train_outcome                   # ACS (default)
-python -m outcome.train_outcome dataset=bar
+uv run python -m outcome.train_outcome                   # ACS (default)
+uv run python -m outcome.train_outcome dataset=bar
 ```
 
 **Outputs:** `outputs/outcome/{acs,bar}/{logreg,mlp}.joblib`
@@ -75,9 +77,9 @@ $$\mathrm{NIE}_i = \sum_k \bar{r}_k\,f(X{=}0,W_k,z_i) - \mathbb{E}_k\bigl[f(X{=}
 The empirical calibration $\lambda_{\mathrm{EB}} = |\mathrm{NDE}| / |\mathrm{NIE}|$ is saved to JSON for use in the recourse stage.
 
 ```bash
-python -m evaluation.estimate_gap                 # ACS (default)
-python -m evaluation.estimate_gap dataset=bar
-python -m evaluation.estimate_gap dataset=acs gap.K=1000 gap.n_inst=1000
+uv run python -m evaluation.estimate_gap                 # ACS (default)
+uv run python -m evaluation.estimate_gap dataset=bar
+uv run python -m evaluation.estimate_gap dataset=acs gap.K=1000 gap.n_inst=1000
 ```
 
 **Outputs:** `outputs/gaps/{acs,bar}_gender_gap.{json,txt}`, LaTeX tables in `outputs/gaps/`
@@ -95,10 +97,10 @@ $$S(w') = \max(0,\,\tau{-}\nu - f(x_i, w', z_i)) + \max(0,\,\tau{-}\nu - f(1{-}x
 The penalty weight defaults to $\lambda = \lambda_{\mathrm{EB}}$ loaded from the gap JSON. Candidate generation is fully vectorised: all mediator combinations are enumerated via a Cartesian grid and evaluated in two bulk `predict_proba` calls per individual.
 
 ```bash
-python -m evaluation.compute_recourse             # ACS, all TN individuals
-python -m evaluation.compute_recourse dataset=bar
-python -m evaluation.compute_recourse dataset=acs recourse.n_max=500
-python -m evaluation.compute_recourse dataset=acs recourse.threshold=0.5 recourse.nu=0.1
+uv run python -m evaluation.compute_recourse             # ACS, all TN individuals
+uv run python -m evaluation.compute_recourse dataset=bar
+uv run python -m evaluation.compute_recourse dataset=acs recourse.n_max=500
+uv run python -m evaluation.compute_recourse dataset=acs recourse.threshold=0.5 recourse.nu=0.1
 ```
 
 **Outputs:** `outputs/recourse/acs_recourse.{tex,txt}`
@@ -108,10 +110,10 @@ python -m evaluation.compute_recourse dataset=acs recourse.threshold=0.5 recours
 Sweeps $\lambda \in \{0,\,\lambda_{\mathrm{EB}}/4,\,\lambda_{\mathrm{EB}}/2,\,\lambda_{\mathrm{EB}},\,2\lambda_{\mathrm{EB}},\,4\lambda_{\mathrm{EB}},\,\infty\}$ on a subsample of true negatives. Uses PyTorch-accelerated inference (sklearn weights loaded into frozen `nn.Linear` / `nn.Sequential`) and caches the candidate pool to disk, so the sweep itself requires zero additional model evaluations.
 
 ```bash
-python -m evaluation.sweep_lambda                 # ACS, n=250 subsample
-python -m evaluation.sweep_lambda dataset=bar
-python -m evaluation.sweep_lambda dataset=acs recourse.sweep_n_max=500
-python -m evaluation.sweep_lambda dataset=acs --config-name config recourse.nu=0.1
+uv run python -m evaluation.sweep_lambda                 # ACS, n=250 subsample
+uv run python -m evaluation.sweep_lambda dataset=bar
+uv run python -m evaluation.sweep_lambda dataset=acs recourse.sweep_n_max=500
+uv run python -m evaluation.sweep_lambda dataset=acs --config-name config recourse.nu=0.1
 ```
 
 **Outputs:** `outputs/recourse/sweep_lambda_{slug}_{stratum}.tex`, `outputs/recourse/sweep_lambda_acs.txt`
@@ -134,13 +136,13 @@ Dataset-specific parameters live in `conf/dataset/acs.yaml` and `conf/dataset/ba
 
 ```bash
 # Change ACS survey year and states
-python -m flows.train_flow dataset.loader.kwargs.year=2019 dataset.loader.kwargs.states=[CA,NY,TX]
+uv run python -m flows.train_flow dataset.loader.kwargs.year=2019 dataset.loader.kwargs.states=[CA,NY,TX]
 
 # Increase IS samples for the gap decomposition
-python -m evaluation.estimate_gap gap.K=1000 gap.n_inst=2000 gap.n_boot=5000
+uv run python -m evaluation.estimate_gap gap.K=1000 gap.n_inst=2000 gap.n_boot=5000
 
 # Tighter recourse threshold with more bootstrap iterations
-python -m evaluation.compute_recourse recourse.threshold=0.6 recourse.nu=0.05 recourse.n_boot=2000
+uv run python -m evaluation.compute_recourse recourse.threshold=0.6 recourse.nu=0.05 recourse.n_boot=2000
 ```
 
 ## Project structure
