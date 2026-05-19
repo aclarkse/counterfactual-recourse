@@ -10,12 +10,15 @@ Equivalent of the bar-dataset flow diagnostics, adapted for all-discrete mediato
 
 Usage
 -----
-  python inspect_acs_model.py
-  python inspect_acs_model.py --model outputs/flows/acs/flow_models.pt
-                               --tensors outputs/data/acs_tensors.pt
+  python diagnostics/inspect_acs_model.py
+  python diagnostics/inspect_acs_model.py --model outputs/flows/acs/flow_models.pt
+                                          --tensors outputs/data/acs_tensors.pt
 """
 
 import argparse
+import sys
+from pathlib import Path
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -23,12 +26,19 @@ import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
 import seaborn as sns
 
+# This script lives in diagnostics/ but imports the project's `flows` package,
+# which sits at the repo root. Put the repo root on sys.path so it resolves when
+# the script is run directly (python diagnostics/inspect_acs_model.py). The flat
+# paper_style / flow_diagnostics_shared imports below resolve from this script's
+# own directory, which stays on sys.path regardless.
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from paper_style import (
     COL_GRP0, COL_GRP1, COL_REF,
     LW, ALPHA_FILL,
     set_paper_style, save_figure,
 )
-from train_acs_flow import DiscreteMediator, ContinuousMediatorFlow, load_flow_models
+from flows.models import DiscreteMediator, ContinuousMediatorFlow, load_flow_models
 from flow_diagnostics_shared import plot_ess_by_group, plot_conditional_marginals
 
 set_paper_style()

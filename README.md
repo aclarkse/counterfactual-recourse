@@ -131,6 +131,19 @@ All summary statistics are reported as means with 95% percentile bootstrap confi
 
 ---
 
+## Flow diagnostics (optional)
+
+After Stage 1, the trained conditional flow $\Pr(W \mid X, Z)$ can be inspected with the standalone scripts in `diagnostics/`. These are **not** part of the five-stage pipeline and nothing downstream imports them — they exist to sanity-check the generated flows before the gap and recourse stages, regenerating the figures in `figures/`: training curves, empirical-vs-model mediator marginals, the counterfactual shift $\Pr(W \mid X{=}1)$ vs $\Pr(W \mid X{=}0)$, and importance-sampling ESS by group (the IS quality that NDE/NIE in Stage 3 depends on).
+
+```bash
+uv run python diagnostics/inspect_acs_model.py   # ACS flow        → figures/acs_income/
+uv run python diagnostics/inspect_bar_model.py   # Law School flow → figures/law_school/
+```
+
+Both accept `--model` / `--tensors` overrides; the defaults point at the Stage 1 outputs (`outputs/flows/.../flow_models.pt`, `outputs/data/..._tensors.pt`).
+
+---
+
 ## Configuration
 
 Dataset-specific parameters live in `conf/dataset/acs.yaml` and `conf/dataset/bar.yaml`. Any field can be overridden at the command line using Hydra dot-notation:
@@ -169,4 +182,10 @@ evaluation/
   estimate_gap.py          # Stage 3 entry point
   compute_recourse.py      # Stage 4 entry point
   sweep_lambda.py          # Stage 4b entry point
+diagnostics/               # Optional flow-inspection scripts (not in the pipeline)
+  inspect_acs_model.py     # ACS flow diagnostics       → figures/acs_income/
+  inspect_bar_model.py     # Law School flow diagnostics → figures/law_school/
+  flow_diagnostics_shared.py  # Shared plot helpers (ESS, conditional marginals)
+  flow_diagnostics.py      # Standalone marginal/ESS plot helpers
+  paper_style.py           # Matplotlib/seaborn paper styling
 ```

@@ -15,24 +15,34 @@ Plots produced
 
 Usage
 -----
-  python inspect_bar_model.py
-  python inspect_bar_model.py --model outputs/flows/law_school/flow_models.pt
-                               --tensors outputs/data/bar_tensors.pt
+  python diagnostics/inspect_bar_model.py
+  python diagnostics/inspect_bar_model.py --model outputs/flows/law_school/flow_models.pt
+                                          --tensors outputs/data/bar_tensors.pt
 """
 
 import argparse
+import sys
+from pathlib import Path
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LogisticRegression
 
+# This script lives in diagnostics/ but imports the project's `flows` package,
+# which sits at the repo root. Put the repo root on sys.path so it resolves when
+# the script is run directly (python diagnostics/inspect_bar_model.py). The flat
+# paper_style / flow_diagnostics_shared imports below resolve from this script's
+# own directory, which stays on sys.path regardless.
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from paper_style import (
     COL_GRP0, COL_GRP1, COL_NDE, COL_NIE,
     LW, MS, ALPHA_FILL,
     set_paper_style, save_figure,
 )
-from train_acs_flow import load_flow_models
+from flows.models import load_flow_models
 from flow_diagnostics_shared import (
     plot_conditional_marginals,
     plot_ess_by_group,
