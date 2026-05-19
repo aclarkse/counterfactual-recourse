@@ -131,9 +131,11 @@ All summary statistics are reported as means with 95% percentile bootstrap confi
 
 ---
 
-## Flow diagnostics (optional)
+## Diagnostics (optional)
 
-After Stage 1, the trained conditional flow $\Pr(W \mid X, Z)$ can be inspected with the standalone scripts in `diagnostics/`. These are **not** part of the five-stage pipeline and nothing downstream imports them — they exist to sanity-check the generated flows before the gap and recourse stages, regenerating the figures in `figures/`: training curves, empirical-vs-model mediator marginals, the counterfactual shift $\Pr(W \mid X{=}1)$ vs $\Pr(W \mid X{=}0)$, and importance-sampling ESS by group (the IS quality that NDE/NIE in Stage 3 depends on).
+The standalone scripts in `diagnostics/` are **not** part of the five-stage pipeline and nothing downstream imports them — they exist to sanity-check the model before/after the gap and recourse stages, regenerating the figures in `figures/`.
+
+**Flow diagnostics** inspect the trained conditional flow $\Pr(W \mid X, Z)$ from Stage 1: training curves, empirical-vs-model mediator marginals, the counterfactual shift $\Pr(W \mid X{=}1)$ vs $\Pr(W \mid X{=}0)$, and importance-sampling ESS by group (the IS quality that NDE/NIE in Stage 3 depends on).
 
 ```bash
 uv run python diagnostics/inspect_acs_model.py   # ACS flow        → figures/acs_income/
@@ -141,6 +143,15 @@ uv run python diagnostics/inspect_bar_model.py   # Law School flow → figures/l
 ```
 
 Both accept `--model` / `--tensors` overrides; the defaults point at the Stage 1 outputs (`outputs/flows/.../flow_models.pt`, `outputs/data/..._tensors.pt`).
+
+**Recourse-shift diagnostic** visualises, per mediator and per outcome model, three densities on the shared $Y{=}0$ evaluation cohort: $W \mid X{=}\text{advantaged}$ (natural reference), $W \mid X{=}\text{disadvantaged}$ (natural, pre-recourse), and $W' \mid X{=}\text{disadvantaged}$ (post-recourse at $\eta=\lambda_{\mathrm{EB}}$) — KDE for continuous mediators, grouped bars for discrete. It reuses the Stage-4b scored candidate cache, so it performs **no** model inference when that cache is present.
+
+```bash
+uv run python diagnostics/inspect_recourse_shift.py            # ACS → figures/acs_income/recourse_shift_{model}.png
+uv run python diagnostics/inspect_recourse_shift.py dataset=bar
+```
+
+Requires Stages 2–3 outputs (`outputs/outcome/<ds>/`, the gap JSON for $\lambda_{\mathrm{EB}}$); rebuilds the scored cache from the outcome model if it is absent.
 
 ---
 
@@ -182,9 +193,10 @@ evaluation/
   estimate_gap.py          # Stage 3 entry point
   compute_recourse.py      # Stage 4 entry point
   sweep_lambda.py          # Stage 4b entry point
-diagnostics/               # Optional flow-inspection scripts (not in the pipeline)
+diagnostics/               # Optional inspection scripts (not in the pipeline)
   inspect_acs_model.py     # ACS flow diagnostics       → figures/acs_income/
   inspect_bar_model.py     # Law School flow diagnostics → figures/law_school/
+  inspect_recourse_shift.py   # Pre/post-recourse W shift vs advantaged ref
   flow_diagnostics_shared.py  # Shared plot helpers (ESS, conditional marginals)
   flow_diagnostics.py      # Standalone marginal/ESS plot helpers
   paper_style.py           # Matplotlib/seaborn paper styling
