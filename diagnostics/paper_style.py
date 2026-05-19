@@ -2,6 +2,7 @@ import os
 from typing import Optional, Sequence
 
 import matplotlib.pyplot as plt
+from matplotlib.legend import Legend as _MplLegend
 import seaborn as sns
 
 
@@ -25,21 +26,37 @@ GROUP_LABELS = {0: "Black", 1: "White"}
 
 
 def set_paper_style() -> None:
-    """Apply a clean, publication-ready global plotting style."""
+    """Apply a clean, publication-ready global plotting style with LaTeX typesetting."""
     sns.set_theme(
         style="white",
         context="paper",
         palette="colorblind",
         rc={
+            # LaTeX typesetting
+            "text.usetex": True,
+            "font.family": "serif",
+            "font.serif": ["Computer Modern Roman"],
+            "text.latex.preamble": r"\usepackage{amsmath}",
+            # Font sizes (matched to body text in a JMLR-style paper)
+            "font.size": 10,
+            "axes.labelsize": 10,
+            "axes.titlesize": 10,
+            "legend.fontsize": 8,
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            # Spines and grid
             "axes.spines.top": False,
             "axes.spines.right": False,
             "axes.grid": False,
-            "font.size": 11,
-            "axes.labelsize": 11,
-            "axes.titlesize": 12,
-            "legend.fontsize": 10,
-            "xtick.labelsize": 10,
-            "ytick.labelsize": 10,
+            # Legend frame (visible, subtle border like the reference figure)
+            "legend.frameon": True,
+            "legend.framealpha": 1.0,
+            "legend.edgecolor": "0.7",
+            "legend.fancybox": False,
+            "legend.borderpad": 0.5,
+            "legend.labelspacing": 0.4,
+            "legend.handlelength": 1.8,
+            # Background / export
             "figure.dpi": 120,
             "savefig.dpi": SAVE_DPI,
             "savefig.facecolor": "white",
@@ -79,3 +96,40 @@ def save_figure(
 def despine_all(axes: Sequence[plt.Axes]) -> None:
     for ax in axes:
         sns.despine(ax=ax)
+
+
+def legend_outside(
+    ax_or_fig,
+    *,
+    title: Optional[str] = None,
+    pad: float = 1.02,
+    **kwargs,
+) -> _MplLegend:
+    """Place a legend to the right of the axes (or figure), outside the plot area.
+
+    Parameters
+    ----------
+    ax_or_fig : matplotlib Axes or Figure
+        If an Axes is passed, the legend is anchored to that axes. If a Figure
+        is passed, a single figure-level legend is created (useful for shared
+        legends across a row of subplots).
+    title : str, optional
+        Legend title.
+    pad : float
+        Horizontal offset from the right edge of the axes/figure, in axes/figure
+        coordinates. 1.02 leaves a thin gap; increase for more separation.
+    **kwargs
+        Forwarded to ``legend()`` (e.g. ``handles=``, ``labels=``).
+    """
+    anchor = (pad, 0.5)
+    legend_kwargs = dict(
+        loc="center left",
+        bbox_to_anchor=anchor,
+        borderaxespad=0.0,
+        title=title,
+    )
+    legend_kwargs.update(kwargs)
+
+    if isinstance(ax_or_fig, plt.Figure):
+        return ax_or_fig.legend(**legend_kwargs)
+    return ax_or_fig.legend(**legend_kwargs)

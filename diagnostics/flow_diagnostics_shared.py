@@ -14,6 +14,7 @@ from paper_style import (
     GROUP_LABELS as _DEFAULT_GROUP_LABELS,
     LW,
     MS,
+    legend_outside,
     save_figure,
     set_paper_style,
 )
@@ -72,9 +73,8 @@ def plot_conditional_marginals(
     fig, axes = plt.subplots(
         1,
         n_features,
-        figsize=(3.0 * n_features, 2.8),
+        figsize=(3.4 * n_features, 2.8),
         sharey=False,
-        constrained_layout=True,
     )
     if n_features == 1:
         axes = [axes]
@@ -132,13 +132,9 @@ def plot_conditional_marginals(
         sns.despine(ax=ax)
 
     handles, labels = axes[0].get_legend_handles_labels()
-    axes[0].legend(
-    handles,
-    labels,
-    frameon=False,
-    loc="center left",
-    bbox_to_anchor=(1.02, 0.5),
-    )
+    _right = 0.62 if n_features == 1 else 0.82
+    fig.subplots_adjust(right=_right, bottom=0.18, wspace=0.30)
+    legend_outside(fig, handles=handles, labels=labels, pad=_right + 0.01)
 
     if save_dir is not None:
         save_figure(fig, "conditional_marginals", save=save, save_dir=save_dir)
@@ -208,7 +204,7 @@ def plot_ess_by_group(
 
     grp_labels = group_labels if group_labels is not None else _DEFAULT_GROUP_LABELS
 
-    fig, ax = plt.subplots(figsize=(3.4, 2.9), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(3.6, 2.9))
 
     data = [ess_by_grp[g] for g in groups]
     labels = [grp_labels[g] for g in groups]
@@ -243,10 +239,10 @@ def plot_ess_by_group(
     ax.set_xticklabels(labels)
     ax.set_ylabel("ESS / K")
     ax.set_ylim(0, 1)
-    ax.legend(frameon=False, loc="best")
 
     import seaborn as sns
     sns.despine(ax=ax)
+    legend_outside(ax)
 
     if save_dir is not None:
         save_figure(fig, "ess_by_group", save=save, save_dir=save_dir)

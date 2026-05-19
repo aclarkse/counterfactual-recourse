@@ -36,7 +36,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from paper_style import (
     COL_GRP0, COL_GRP1, COL_REF,
     LW, ALPHA_FILL,
-    set_paper_style, save_figure,
+    set_paper_style, save_figure, legend_outside,
 )
 from flows.models import DiscreteMediator, ContinuousMediatorFlow, load_flow_models
 from flow_diagnostics_shared import plot_ess_by_group, plot_conditional_marginals
@@ -47,7 +47,7 @@ GROUP_LABELS = {0: "Female", 1: "Male"}
 
 SCHL_LABELS  = ["<HS", "HS", "Some col.", "Bachelor's", "Master's", "Doctoral+"]
 OCCP_LABELS  = ["Mgmt", "Biz/Fin", "STEM", "STEM sup.", "Arts", "Health",
-                "Service", "Sales/Adm", "Constr.", "Transport"]
+                "Service", "Sales/Adm", "Constr./Prod.", "Transport/Other"]
 
 CATEGORY_LABELS = {
     "SCHL_GRP": SCHL_LABELS,
@@ -109,7 +109,7 @@ def make_sample_fns(g_phi, f_theta, scaler, device):
 # ── Plot 1: Training curve ────────────────────────────────────────────────────
 
 def plot_training_curve(history: dict, save: bool = True):
-    fig, ax = plt.subplots(figsize=(5.5, 3.0), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(5.5, 3.0))
     epochs = range(1, len(history["train"]) + 1)
     ax.plot(epochs, history["train"], label="Train NLL", color=COL_GRP0, lw=LW)
     ax.plot(epochs, history["val"],   label="Val NLL",   color=COL_GRP1, lw=LW)
@@ -118,8 +118,8 @@ def plot_training_curve(history: dict, save: bool = True):
                 lw=LW, ls="--", alpha=0.6)
     ax.set_xlabel("Epoch")
     ax.set_ylabel(r"$-\log p(W \mid X, Z)$")
-    ax.legend(frameon=False)
     sns.despine(ax=ax)
+    legend_outside(ax)
     path = save_figure(fig, "acs_training_curve", save=save, save_dir="figures/acs_income")
     if path:
         print(f"  Saved → {path}")
@@ -175,9 +175,7 @@ def plot_discrete_marginals(
     width       = 0.18
     gap         = 0.04   # extra space between Female and Male bar pairs
 
-    fig, axes = plt.subplots(1, n_cols,
-                             figsize=(4.5 * n_cols, 3.4),
-                             constrained_layout=True)
+    fig, axes = plt.subplots(1, n_cols, figsize=(4.5 * n_cols, 3.4))
     if n_cols == 1:
         axes = [axes]
 
@@ -214,16 +212,16 @@ def plot_discrete_marginals(
 
     legend_handles = [
         mpatches.Patch(facecolor=COL_GRP0, alpha=0.35, hatch="///",
-                       edgecolor=COL_GRP0, label="Female — empirical"),
+                       edgecolor=COL_GRP0, label="Female -- empirical"),
         mpatches.Patch(facecolor=COL_GRP0, alpha=0.80,
-                       label="Female — model"),
+                       label="Female -- model"),
         mpatches.Patch(facecolor=COL_GRP1, alpha=0.35, hatch="///",
-                       edgecolor=COL_GRP1, label="Male — empirical"),
+                       edgecolor=COL_GRP1, label="Male -- empirical"),
         mpatches.Patch(facecolor=COL_GRP1, alpha=0.80,
-                       label="Male — model"),
+                       label="Male -- model"),
     ]
-    fig.legend(handles=legend_handles, frameon=False, loc="upper right",
-               bbox_to_anchor=(1.0, 1.0), fontsize=9)
+    fig.subplots_adjust(right=0.82, bottom=0.22, wspace=0.25)
+    legend_outside(fig, handles=legend_handles, pad=0.83)
 
     path = save_figure(fig, "acs_discrete_marginals", save=save, save_dir="figures/acs_income")
     if path:
@@ -263,11 +261,11 @@ def plot_counterfactual_shift(
     h0 = g_phi.backbone(g_phi._cond(x0_d, Z_d))
     h1 = g_phi.backbone(g_phi._cond(x1_d, Z_d))
 
-    fig, axes = plt.subplots(1, n_cols, figsize=(4.5 * n_cols, 3.2),
-                             constrained_layout=True)
+    fig, axes = plt.subplots(1, n_cols, figsize=(4.5 * n_cols, 3.2))
     if n_cols == 1:
         axes = [axes]
 
+    last_ax2 = None
     for ax, (col_idx, (col, head)) in zip(axes, enumerate(zip(col_names, g_phi.heads))):
         n_cats = vocab[col]
         cats   = np.arange(n_cats)
@@ -290,15 +288,23 @@ def plot_counterfactual_shift(
         ax2.axhline(0, color=COL_REF, lw=0.8, ls="--")
         ax2.set_ylabel(r"$\Delta P(W_j = k)$" if col_idx == n_cols - 1 else "")
         ax2.tick_params(labelsize=7)
+        last_ax2 = ax2
 
         ax.set_xticks(cats)
         ax.set_xticklabels(cat_labels[:n_cats], rotation=35, ha="right", fontsize=7)
         ax.set_xlabel(MEDIATOR_DISPLAY.get(col, col))
         ax.set_ylabel(r"$P(W_j = k \mid \mathrm{Sex})$" if col_idx == 0 else "")
-        sns.despine(ax=ax)
+        sns.despine(ax=ax, right=False)
 
-    handles0, labels0 = axes[0].get_legend_handles_labels()
-    axes[0].legend(handles0, labels0, frameon=False, fontsize=8)
+    h_bars,  l_bars  = axes[0].get_legend_handles_labels()
+    h_lines, l_lines = last_ax2.get_legend_handles_labels()
+    # Right twinx needs ~0.07 of figure width for its ylabel + ticks; place
+    # the legend just past that, not at the figure's right edge.
+    fig.subplots_adjust(right=0.78, bottom=0.22, wspace=0.30)
+    legend_outside(fig,
+                   handles=h_bars + h_lines,
+                   labels=l_bars + l_lines,
+                   pad=0.86)
     path = save_figure(fig, "acs_counterfactual_shift", save=save, save_dir="figures/acs_income")
     if path:
         print(f"  Saved → {path}")
