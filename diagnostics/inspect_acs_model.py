@@ -45,7 +45,7 @@ set_paper_style()
 
 GROUP_LABELS = {0: "Female", 1: "Male"}
 
-SCHL_LABELS  = ["<HS", "HS", "Some col.", "Bachelor's", "Master's", "Doctoral+"]
+SCHL_LABELS  = [r"$<$HS", "HS", "Some col.", "Bachelor's", "Master's", "Doctoral+"]
 OCCP_LABELS  = ["Mgmt", "Biz/Fin", "STEM", "STEM sup.", "Arts", "Health",
                 "Service", "Sales/Adm", "Constr./Prod.", "Transport/Other"]
 

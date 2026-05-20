@@ -73,7 +73,7 @@ SEX_LABELS      = {0: "Female", 1: "Male"}
 # mediators fall back to integer codes / the raw column name, so the script
 # still runs on other datasets, just without pretty labels.
 CATEGORY_LABELS = {
-    "SCHL_GRP": ["<HS", "HS", "Some col.", "Bachelor's", "Master's", "Doctoral+"],
+    "SCHL_GRP": [r"$<$HS", "HS", "Some col.", "Bachelor's", "Master's", "Doctoral+"],
     "OCCP_GRP": ["Mgmt", "Biz/Fin", "STEM", "STEM sup.", "Arts", "Health",
                  "Service", "Sales/Adm", "Constr./Prod.", "Transport/Other"],
 }
@@ -151,7 +151,7 @@ def _reconstruct(data, scaler, eval_idx, all_candidates, sex_labels, leb,
 
 
 def _plot_model(series, disc_names, cont_names, vocab, mediator_specs,
-                model_name, leb, n_adv, n_dis, figures_dir, slug):
+                n_adv, n_dis, figures_dir, slug):
     """One figure for one model: a panel per mediator dimension."""
     adv_lbl  = SEX_LABELS[ADVANTAGED_X]
     dis_lbl  = SEX_LABELS[DISADVANTAGED_X]
@@ -200,11 +200,7 @@ def _plot_model(series, disc_names, cont_names, vocab, mediator_specs,
         sns.despine(ax=ax)
 
     handles = [plt.Rectangle((0, 0), 1, 1, color=c, alpha=0.85) for c in cols]
-    fig.suptitle(
-        rf"Recourse-induced shift -- {model_name}  "
-        rf"($\lambda_{{\mathrm{{EB}}}}={leb:.4f}$)",
-    )
-    fig.subplots_adjust(right=0.80, top=0.86, bottom=0.22, wspace=0.30)
+    fig.subplots_adjust(right=0.80, bottom=0.22, wspace=0.30)
     legend_outside(fig, handles=handles, labels=leg, pad=0.81)
 
     path = save_figure(fig, f"recourse_shift_{slug}", save=True,
@@ -289,7 +285,7 @@ def main(cfg):
               f"{n_dis} {SEX_LABELS[DISADVANTAGED_X]} (pre/post)")
 
         _plot_model(series, disc_names, cont_names, vocab, mediator_specs,
-                    name, leb, n_adv, n_dis, figures_dir, slug_file)
+                    n_adv, n_dis, figures_dir, slug_file)
 
     print(f"\nAll recourse-shift figures → {figures_dir}/")
 
