@@ -4,7 +4,6 @@ evaluation/compute_recourse.py — Generic Hydra entry point for counterfactual 
 Run: python -m evaluation.compute_recourse [dataset=acs|bar]
 """
 
-import json
 import os
 import time
 import warnings
@@ -18,6 +17,18 @@ import hydra
 from omegaconf import OmegaConf
 
 from data.build_tensors import stack_sfm_features
+from flows.interventions import sample_intervention_batch
+from flows.models import load_flow_models
+from flows.diagnostics import make_sample_fns
+from flows.schema import MediatorSchema
+from evaluation.recourse_metrics import (
+    add_candidate_geometry,
+    add_sampled_candidate_geometry,
+    attach_mediated_disparities,
+    estimate_reference_terms,
+    select_best as _select_best,
+    select_recourse_indices,
+)
 
 SAVE_DIR = "outputs/recourse"
 
@@ -226,55 +237,195 @@ def precompute_candidates_batch(pipe, scaler, xi, zi, wdi, wci,
     ]
 
 
-def select_best(candidates: list, eta: float) -> dict:
-    """Return the candidate minimising  cost + η · shortfall."""
-    return min(candidates, key=lambda c: c["cost"] + eta * c["shortfall"])
+def _predict_proba_batched(pipe, features, batch_size=100_000):
+    return np.concatenate([
+        pipe.predict_proba(features[start:start + batch_size])[:, 1]
+        for start in range(0, len(features), batch_size)
+    ])
+
+
+def precompute_interventional_candidates_batch(
+        pipe, scaler, xi, zi, wdi, wci,
+        disc_names, cont_names, mediator_specs, vocab, weights,
+        threshold, nu, g_phi, f_theta, schema, device,
+        reference_wd, reference_wc, n_samples=32,
+        same_level="preserve_factual"):
+    """Evaluate direct action plans after propagating strict descendants.
+
+    Candidate grids specify *directly manipulated* values.  Coordinates left
+    at their factual value are not silently interpreted as joint hard
+    interventions: later causal blocks are sampled from their learned
+    mechanisms, while unacted coordinates in the same unordered block obey
+    the explicitly selected ``same_level`` semantics.
+    """
+    xi_val = float(xi[0, 0].item())
+    zi_np = zi[0].numpy().astype(np.float32)
+    wdi_np = wdi[0].numpy()
+    wci_raw = wci[0].numpy()
+    if scaler is not None and len(wci_raw):
+        wci_natural = scaler.inverse_transform(wci_raw.reshape(1, -1))[0]
+    else:
+        wci_natural = wci_raw
+
+    feat_xi, _, cost_col, change_data = _build_candidate_arrays(
+        xi_val, zi_np, wdi_np, wci_natural,
+        disc_names, cont_names, mediator_specs, vocab, weights,
+    )
+    n_plans = len(cost_col)
+    n_z, n_disc, n_cont = len(zi_np), len(disc_names), len(cont_names)
+    mediator_start = 1 + n_z
+    target_wd_np = feat_xi[:, mediator_start:mediator_start + n_disc].astype(np.int64)
+    target_wc_nat = feat_xi[:, mediator_start + n_disc:].astype(np.float32)
+    mask_wd_np = target_wd_np != wdi_np[None, :]
+    mask_wc_np = ~np.isclose(target_wc_nat, wci_natural[None, :], atol=1e-7)
+    if n_cont and scaler is not None:
+        target_wc_std = scaler.transform(target_wc_nat).astype(np.float32)
+    else:
+        target_wc_std = target_wc_nat
+
+    repeat_rows = lambda tensor: tensor.repeat(n_plans, 1)
+    samples = sample_intervention_batch(
+        g_phi, f_theta, schema,
+        repeat_rows(xi).to(device), repeat_rows(zi).to(device),
+        repeat_rows(wdi).to(device), repeat_rows(wci).to(device),
+        torch.as_tensor(target_wd_np, dtype=torch.long, device=device),
+        torch.as_tensor(target_wc_std, dtype=torch.float32, device=device),
+        torch.as_tensor(mask_wd_np, dtype=torch.bool, device=device),
+        torch.as_tensor(mask_wc_np, dtype=torch.bool, device=device),
+        n_samples=n_samples, same_level=same_level,
+    )
+    sampled_wd = samples.w_disc.cpu()
+    sampled_wc = samples.w_cont.cpu()
+    sampled_x = samples.x.cpu()
+    sampled_z = samples.z.cpu()
+    feat_actual = stack_sfm_features(
+        sampled_x, sampled_z, sampled_wd, sampled_wc, scaler
+    )
+    feat_counterfactual = stack_sfm_features(
+        1.0 - sampled_x, sampled_z, sampled_wd, sampled_wc, scaler
+    )
+    p_actual_draws = _predict_proba_batched(pipe, feat_actual).reshape(n_plans, n_samples)
+    p_cf_draws = _predict_proba_batched(pipe, feat_counterfactual).reshape(n_plans, n_samples)
+    soft_thr = threshold - nu
+    shortfall = (
+        np.maximum(0.0, soft_thr - p_actual_draws)
+        + np.maximum(0.0, soft_thr - p_cf_draws)
+    ).mean(axis=1)
+
+    candidates = []
+    for i in range(n_plans):
+        candidates.append(dict(
+            cost=float(cost_col[i]),
+            shortfall=float(shortfall[i]),
+            p_xi=float(p_actual_draws[i].mean()),
+            p_xcf=float(p_cf_draws[i].mean()),
+            direct_effect=float(np.abs(p_cf_draws[i] - p_actual_draws[i]).mean()),
+            success_probability_xi=float((p_actual_draws[i] >= soft_thr).mean()),
+            success_probability_xcf=float((p_cf_draws[i] >= soft_thr).mean()),
+            outcome_sd_xi=float(p_actual_draws[i].std()),
+            outcome_sd_xcf=float(p_cf_draws[i].std()),
+            intervention_semantics="propagate_strict_descendants",
+            same_level_semantics=same_level,
+            **{key: (int(value[i]) if value.dtype == np.int32 else float(value[i]))
+               for key, value in change_data.items()},
+        ))
+
+    sampled_wd_np = sampled_wd.numpy().reshape(n_plans, n_samples, n_disc)
+    sampled_wc_std = sampled_wc.numpy()
+    if n_cont and scaler is not None:
+        sampled_wc_nat = scaler.inverse_transform(sampled_wc_std)
+    else:
+        sampled_wc_nat = sampled_wc_std
+    sampled_wc_nat = sampled_wc_nat.reshape(n_plans, n_samples, n_cont)
+    add_sampled_candidate_geometry(
+        candidates, sampled_wd_np, sampled_wc_nat,
+        reference_wd, reference_wc,
+        disc_names, cont_names, mediator_specs,
+    )
+    return candidates
+
+
+def select_best(candidates: list, eta: float, lambda_invariance: float = 0.0,
+                rho_anchor: float = 0.0) -> dict:
+    """Backward-compatible export of the correctly separated objective."""
+    return _select_best(candidates, eta, lambda_invariance, rho_anchor)
 
 
 # ── Batch recourse ────────────────────────────────────────────────────────────
 
 def run_recourse_batch(pipe, scaler, data, disc_names, cont_names,
                        mediator_specs, vocab, weights,
-                       threshold, nu, eta, n_max=None, rng_seed=0):
+                       threshold, nu, eta, lambda_invariance, rho_anchor,
+                       sample_fn, g_phi=None, f_theta=None, schema=None,
+                       device=None, propagate_descendants=True,
+                       intervention_K=32,
+                       same_level_semantics="preserve_factual",
+                       reference_K=200, disadvantaged_value=0,
+                       advantaged_value=1, n_max=None, rng_seed=0):
     """
-    Identify true negatives, precompute candidate grids (vectorised),
-    and select the best intervention at penalty weight η = eta.
+    Generate recourse for disadvantaged-group true negatives only and evaluate
+    the post-recourse mediated disparity on those recipients' Z distribution.
     """
     X_va  = data["X_va"]
     Z_va  = data["Z_va"]
     Wd_va = data["Wd_va"]
     Wc_va = data["Wc_va"]
-    Y_va  = data["Y_va"].numpy().astype(int)
-
-    feat_all = stack_sfm_features(X_va, Z_va, Wd_va, Wc_va, scaler)
-    yhat_all = pipe.predict(feat_all)
-    tn_mask  = (Y_va == 0) & (yhat_all == 0)
-    tn_idx   = np.where(tn_mask)[0]
-    print(f"  True negatives: {len(tn_idx):,} / {len(Y_va):,}")
-
-    rng = np.random.default_rng(rng_seed)
-    if n_max is not None and len(tn_idx) > n_max:
-        tn_idx = rng.choice(tn_idx, n_max, replace=False)
-        print(f"  Subsampled to {n_max:,}")
+    tn_idx = select_recourse_indices(
+        data, pipe, scaler, disadvantaged_value, n_max, rng_seed,
+    )
+    print(f"  Disadvantaged-group true negatives: {len(tn_idx):,}")
+    references = estimate_reference_terms(
+        pipe, scaler, Z_va[tn_idx], sample_fn, K=reference_K,
+        disadvantaged_value=disadvantaged_value,
+        advantaged_value=advantaged_value,
+    )
 
     results = []
     t0      = time.time()
 
     for k, i in enumerate(tn_idx):
-        cands = precompute_candidates_batch(
-            pipe, scaler,
-            X_va[i].unsqueeze(0), Z_va[i].unsqueeze(0),
-            Wd_va[i].unsqueeze(0), Wc_va[i].unsqueeze(0),
-            disc_names, cont_names, mediator_specs, vocab, weights,
-            threshold, nu,
+        wd_fact = Wd_va[i].numpy()
+        wc_raw = Wc_va[i].numpy()
+        wc_fact = (scaler.inverse_transform(wc_raw.reshape(1, -1))[0]
+                   if scaler is not None and len(wc_raw) else wc_raw)
+        if propagate_descendants:
+            if any(value is None for value in (g_phi, f_theta, schema, device)):
+                raise ValueError(
+                    "Flow models, schema, and device are required when "
+                    "propagate_descendants=True."
+                )
+            cands = precompute_interventional_candidates_batch(
+                pipe, scaler,
+                X_va[i].unsqueeze(0), Z_va[i].unsqueeze(0),
+                Wd_va[i].unsqueeze(0), Wc_va[i].unsqueeze(0),
+                disc_names, cont_names, mediator_specs, vocab, weights,
+                threshold, nu, g_phi, f_theta, schema, device,
+                references["wd_reference"][k], references["wc_reference"][k],
+                n_samples=intervention_K,
+                same_level=same_level_semantics,
+            )
+        else:
+            cands = precompute_candidates_batch(
+                pipe, scaler,
+                X_va[i].unsqueeze(0), Z_va[i].unsqueeze(0),
+                Wd_va[i].unsqueeze(0), Wc_va[i].unsqueeze(0),
+                disc_names, cont_names, mediator_specs, vocab, weights,
+                threshold, nu,
+            )
+            add_candidate_geometry(
+                cands, wd_fact, wc_fact,
+                references["wd_reference"][k], references["wc_reference"][k],
+                disc_names, cont_names, mediator_specs,
+            )
+        best = dict(select_best(cands, eta, lambda_invariance, rho_anchor))
+        factual = min(cands, key=lambda c: c["cost"])
+        factual_prediction = factual["p_xi"]
+        attach_mediated_disparities(
+            best, references["reference"][k],
+            references["natural_disadvantaged"][k], factual_prediction,
+            disadvantaged_value,
         )
-        best        = select_best(cands, eta)
-        sex         = int(X_va[i, 0].item())
-        best["sex"] = sex
-        # Post-recourse NIE: signed gap at recourse solution w'
-        p_g1     = best["p_xcf"] if sex == 0 else best["p_xi"]
-        p_g0     = best["p_xi"]  if sex == 0 else best["p_xcf"]
-        best["nie_post"] = float(p_g1 - p_g0)
+        best["group"] = disadvantaged_value
         results.append(best)
 
         if (k + 1) % 50 == 0 or (k + 1) == len(tn_idx):
@@ -304,6 +455,28 @@ def _bootstrap_ci(arr, n_boot=1000, alpha=0.05, rng=None):
             float(np.percentile(boots, 100 * (1 - alpha / 2))))
 
 
+def _bootstrap_absolute_closure(pre, post, n_boot=1000, alpha=0.05, rng=None):
+    """Fraction of the absolute population disparity closed after recourse."""
+    if rng is None:
+        rng = np.random.default_rng(0)
+    pre = np.asarray(pre, dtype=float)
+    post = np.asarray(post, dtype=float)
+    if len(pre) == 0 or abs(pre.mean()) <= 1e-12:
+        return (float("nan"),) * 3
+    point = 1.0 - abs(post.mean()) / abs(pre.mean())
+    boots = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, len(pre), len(pre))
+        denominator = abs(pre[idx].mean())
+        boots.append(
+            1.0 - abs(post[idx].mean()) / denominator
+            if denominator > 1e-12 else np.nan
+        )
+    return (float(point),
+            float(np.nanpercentile(boots, 100 * alpha / 2)),
+            float(np.nanpercentile(boots, 100 * (1 - alpha / 2))))
+
+
 def aggregate(results: list, disc_names: list, cont_names: list,
               mediator_specs: dict, n_boot: int = 1000) -> dict:
     """
@@ -315,7 +488,12 @@ def aggregate(results: list, disc_names: list, cont_names: list,
     if n == 0:
         nan3 = (float("nan"),) * 3
         base = {"n": 0, "n_feasible": 0, "feasible_rate": nan3,
-                "cost": nan3, "shortfall": nan3, "nie_post": nan3}
+                "cost": nan3, "shortfall": nan3, "direct_effect": nan3,
+                "transport": nan3,
+                "pre_recourse_mediated_prediction_disparity": nan3,
+                "pre_recourse_factual_mediated_prediction_disparity": nan3,
+                "post_recourse_mediated_prediction_disparity": nan3,
+                "factual_mediated_prediction_disparity_closure": nan3}
         for name in disc_names + cont_names:
             base[name] = nan3
         return base
@@ -324,7 +502,17 @@ def aggregate(results: list, disc_names: list, cont_names: list,
     feas = np.array([float(r["shortfall"] == 0.0) for r in results])
     d_cost = np.array([r["cost"]       for r in results], dtype=float)
     d_sf   = np.array([r["shortfall"]  for r in results], dtype=float)
-    d_nie  = np.array([r["nie_post"]   for r in results], dtype=float)
+    d_direct = np.array([r["direct_effect"] for r in results], dtype=float)
+    d_transport = np.array([r["transport"] for r in results], dtype=float)
+    d_pre = np.array([
+        r["pre_recourse_mediated_prediction_disparity"] for r in results
+    ], dtype=float)
+    d_pre_fact = np.array([
+        r["pre_recourse_factual_mediated_prediction_disparity"] for r in results
+    ], dtype=float)
+    d_post = np.array([
+        r["post_recourse_mediated_prediction_disparity"] for r in results
+    ], dtype=float)
 
     out = {
         "n":             n,
@@ -332,7 +520,20 @@ def aggregate(results: list, disc_names: list, cont_names: list,
         "feasible_rate": _bootstrap_ci(feas,   n_boot, rng=rng),
         "cost":          _bootstrap_ci(d_cost, n_boot, rng=rng),
         "shortfall":     _bootstrap_ci(d_sf,   n_boot, rng=rng),
-        "nie_post":      _bootstrap_ci(d_nie,  n_boot, rng=rng),
+        "direct_effect": _bootstrap_ci(d_direct, n_boot, rng=rng),
+        "transport": _bootstrap_ci(d_transport, n_boot, rng=rng),
+        "pre_recourse_mediated_prediction_disparity": _bootstrap_ci(
+            d_pre, n_boot, rng=rng
+        ),
+        "pre_recourse_factual_mediated_prediction_disparity": _bootstrap_ci(
+            d_pre_fact, n_boot, rng=rng
+        ),
+        "post_recourse_mediated_prediction_disparity": _bootstrap_ci(
+            d_post, n_boot, rng=rng
+        ),
+        "factual_mediated_prediction_disparity_closure": _bootstrap_absolute_closure(
+            d_pre_fact, d_post, n_boot, rng=rng
+        ),
     }
 
     for name in disc_names:
@@ -353,13 +554,11 @@ def aggregate(results: list, disc_names: list, cont_names: list,
 
 def stratify(results: list, disc_names: list, cont_names: list,
              mediator_specs: dict, n_boot: int = 1000) -> dict:
-    female = [r for r in results if r["sex"] == 0]
-    male   = [r for r in results if r["sex"] == 1]
-    return {
-        "overall": aggregate(results, disc_names, cont_names, mediator_specs, n_boot),
-        "female":  aggregate(female,  disc_names, cont_names, mediator_specs, n_boot),
-        "male":    aggregate(male,    disc_names, cont_names, mediator_specs, n_boot),
-    }
+    # Recourse is intentionally restricted to one disadvantaged group. Keeping
+    # only an overall recipient summary avoids an undefined advantaged-group
+    # "post-recourse" estimand.
+    return {"recipients": aggregate(results, disc_names, cont_names,
+                                     mediator_specs, n_boot)}
 
 
 # ── LaTeX table ───────────────────────────────────────────────────────────────
@@ -376,8 +575,6 @@ def make_recourse_table(all_stats: dict, model_names: list,
                         disc_names: list, cont_names: list,
                         mediator_specs: dict,
                         caption: str, label: str) -> str:
-    strata = [("overall", "Overall"), ("female", "Female"), ("male", "Male")]
-
     # Build dynamic column headers from mediator config
     med_headers = []
     for name in disc_names + cont_names:
@@ -385,7 +582,7 @@ def make_recourse_table(all_stats: dict, model_names: list,
         med_headers.append(display)
 
     n_med_cols = len(med_headers)
-    col_spec = "ll" + "c" * (4 + n_med_cols)
+    col_spec = "l" + "c" * (10 + n_med_cols)
     header_cells = " & ".join(med_headers)
 
     lines = [
@@ -396,45 +593,33 @@ def make_recourse_table(all_stats: dict, model_names: list,
         r"  \setlength{\tabcolsep}{4pt}",
         f"  \\begin{{tabular}}{{{col_spec}}}",
         r"    \toprule",
-        f"    Model & Group & $n_{{\\mathrm{{TN}}}}$ & Feasible ($S{{=}}0$) & "
+        f"    Model & $n$ & Feasible ($S{{=}}0$) & "
         f"{header_cells}"
-        r" & Cost & Shortfall $S$ & $\mathrm{NIE}_{\mathrm{post}}$ \\",
+        r" & Cost & Shortfall & Direct gap & Transport UB & $D_{\rm pre}$ & $D_{\rm pre}^{\rm factual}$ & $D_{\rm post}$ & Factual closure \\",
         r"    \midrule",
     ]
     for mi, name in enumerate(model_names):
         if mi > 0:
             lines.append(r"    \midrule")
-        stats = all_stats[name]
-        first = True
-        for key, label_str in strata:
-            s = stats.get(key)
-            if s is None:
-                continue
-            model_cell = name if first else ""
-            first = False
-
-            # Build mediator cells in order
-            med_cells = []
-            for mname in disc_names:
-                spec = mediator_specs[mname]
-                actionable = spec.get("actionable", "free")
-                if actionable == "free":
-                    # percentage format
-                    med_cells.append(_pct_cell(*s[mname]))
-                else:
-                    med_cells.append(_ci_cell(*s[mname]))
-            for mname in cont_names:
-                med_cells.append(_ci_cell(*s[mname], fmt=".1f"))
-
-            med_str = " & ".join(med_cells)
-            lines.append(
-                f"    {model_cell} & {label_str} & {s['n']} & "
-                f"{_pct_cell(*s['feasible_rate'])} & "
-                f"{med_str} & "
-                f"{_ci_cell(*s['cost'], fmt='.3f')} & "
-                f"{_ci_cell(*s['shortfall'], fmt='.4f')} & "
-                f"{_ci_cell(*s['nie_post'], fmt='.4f')} \\\\"
-            )
+        s = all_stats[name]["recipients"]
+        med_cells = []
+        for mname in disc_names:
+            spec = mediator_specs[mname]
+            med_cells.append(_pct_cell(*s[mname]) if spec.get("actionable", "free") == "free"
+                             else _ci_cell(*s[mname]))
+        for mname in cont_names:
+            med_cells.append(_ci_cell(*s[mname], fmt=".1f"))
+        lines.append(
+            f"    {name} & {s['n']} & {_pct_cell(*s['feasible_rate'])} & "
+            f"{' & '.join(med_cells)} & {_ci_cell(*s['cost'], fmt='.3f')} & "
+            f"{_ci_cell(*s['shortfall'], fmt='.4f')} & "
+            f"{_ci_cell(*s['direct_effect'], fmt='.4f')} & "
+            f"{_ci_cell(*s['transport'], fmt='.4f')} & "
+            f"{_ci_cell(*s['pre_recourse_mediated_prediction_disparity'], fmt='.4f')} & "
+            f"{_ci_cell(*s['pre_recourse_factual_mediated_prediction_disparity'], fmt='.4f')} & "
+            f"{_ci_cell(*s['post_recourse_mediated_prediction_disparity'], fmt='.4f')} & "
+            f"{_pct_cell(*s['factual_mediated_prediction_disparity_closure'])} \\\\"
+        )
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table}"]
     return "\n".join(lines)
 
@@ -449,11 +634,8 @@ def print_summary(all_stats: dict, model_names: list,
         hdr = f"\n{'='*60}\n{name}\n{'='*60}"
         print(hdr)
         lines.append(hdr)
-        for key, label_str in [("overall", "Overall"), ("female", "Female"),
-                                ("male", "Male")]:
-            s = all_stats[name].get(key)
-            if s is None:
-                continue
+        for key, label_str in [("recipients", "Recipients")]:
+            s = all_stats[name][key]
             fr  = s["feasible_rate"]
             med_parts = []
             for mname in disc_names:
@@ -472,7 +654,12 @@ def print_summary(all_stats: dict, model_names: list,
                 f"{med_str}  "
                 f"cost={s['cost'][0]:.3f}  "
                 f"shortfall={s['shortfall'][0]:.4f}  "
-                f"NIE_post={s['nie_post'][0]:+.4f}"
+                f"direct={s['direct_effect'][0]:+.4f}  "
+                f"transport_UB={s['transport'][0]:.4f}  "
+                f"D_pre={s['pre_recourse_mediated_prediction_disparity'][0]:+.4f}  "
+                f"D_pre_factual={s['pre_recourse_factual_mediated_prediction_disparity'][0]:+.4f}  "
+                f"D_post={s['post_recourse_mediated_prediction_disparity'][0]:+.4f}  "
+                f"factual_closure={s['factual_mediated_prediction_disparity_closure'][0]:+.1%}"
             )
             print(row)
             lines.append(row)
@@ -483,9 +670,10 @@ def print_summary(all_stats: dict, model_names: list,
 
 @hydra.main(config_path="../conf", config_name="config", version_base="1.1")
 def main(cfg):
+    torch.manual_seed(int(cfg.seed))
+    np.random.seed(int(cfg.seed))
     tensors_path   = cfg.dataset.paths.tensors
     outcome_dir    = cfg.dataset.paths.outcome_dir
-    gaps_dir       = cfg.dataset.paths.gaps_dir
     recourse_dir   = cfg.dataset.paths.recourse_dir
     dataset_name   = cfg.dataset.name
 
@@ -507,23 +695,32 @@ def main(cfg):
     recourse_cfg   = cfg.dataset.recourse
     type_to_slug   = {"logreg": "logreg", "mlp": "mlp"}
 
-    # Load per-model λ_EB from gap JSON
-    lam_by_model = {}
-    gap_json_path = f"{gaps_dir}/{dataset_name}_gender_gap.json"
-    if os.path.exists(gap_json_path):
-        with open(gap_json_path, encoding="utf-8") as f:
-            snap = json.load(f)
-        for mname, strata in snap.items():
-            nde = strata["overall"]["nde"]
-            nie = strata["overall"]["nie"]
-            if abs(nie) > 1e-12:
-                lam_by_model[mname] = abs(nde / nie)
-        if lam_by_model:
-            print("λ_EB loaded from gap JSON:")
-            for mname, lv in lam_by_model.items():
-                print(f"  {mname}: {lv:.4f}")
-    else:
-        print(f"Gap JSON not found at {gap_json_path}. Using fallback λ=10.0.")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    g_phi, f_theta, _, flow_sfm_cfg = load_flow_models(
+        cfg.dataset.paths.flows, device
+    )
+    if (bool(recourse_cfg.get("propagate_descendants", True))
+            and "mediator_layers" not in flow_sfm_cfg):
+        raise RuntimeError(
+            "The configured flow checkpoint predates explicit mediator blocks. "
+            "Retrain with flows.train_flow for revised intervention results, "
+            "or set dataset.recourse.propagate_descendants=false only to "
+            "reproduce the legacy joint-point analysis."
+        )
+    sample_fn, _ = make_sample_fns(g_phi, f_theta, scaler, device)
+    schema = MediatorSchema.from_sfm_config(
+        OmegaConf.to_container(cfg.dataset.sfm, resolve=True)
+    )
+    if (bool(recourse_cfg.get("propagate_descendants", True))
+            and MediatorSchema.from_sfm_config(flow_sfm_cfg).layers
+            != schema.layers):
+        raise RuntimeError(
+            "Configured mediator_layers do not match the trained flow "
+            "checkpoint. Retrain or restore the checkpoint's schema."
+        )
+    eta = float(recourse_cfg.eta)
+    lambda_invariance = float(recourse_cfg.lambda_invariance)
+    rho_anchor = float(recourse_cfg.rho_anchor)
 
     n_max_cfg = int(recourse_cfg.n_max)
     n_max     = n_max_cfg if n_max_cfg > 0 else None
@@ -535,17 +732,35 @@ def main(cfg):
         name = spec["name"]
         slug = type_to_slug.get(spec["type"], spec["type"])
         pipe = joblib.load(f"{outcome_dir}/{slug}.joblib")
-        eta  = lam_by_model.get(name, 10.0)
-
-        print(f"\n[{name}]  λ={eta:.4f}  τ={recourse_cfg.threshold}  "
-              f"ν={recourse_cfg.nu}  soft_thr={recourse_cfg.threshold - recourse_cfg.nu:.3f}")
+        print(f"\n[{name}]  η={eta:.4f}  λ={lambda_invariance:.4f}  "
+              f"ρ={rho_anchor:.4f}  τ={recourse_cfg.threshold}  "
+              f"ν={recourse_cfg.nu}  soft_thr={recourse_cfg.threshold - recourse_cfg.nu:.3f}  "
+              f"propagate={bool(recourse_cfg.get('propagate_descendants', True))}")
         results = run_recourse_batch(
             pipe, scaler, data,
             disc_names, cont_names, mediator_specs, vocab, weights,
             threshold=float(recourse_cfg.threshold),
             nu=float(recourse_cfg.nu),
             eta=eta,
+            lambda_invariance=lambda_invariance,
+            rho_anchor=rho_anchor,
+            sample_fn=sample_fn,
+            g_phi=g_phi,
+            f_theta=f_theta,
+            schema=schema,
+            device=device,
+            propagate_descendants=bool(
+                recourse_cfg.get("propagate_descendants", True)
+            ),
+            intervention_K=int(recourse_cfg.get("intervention_K", 32)),
+            same_level_semantics=str(recourse_cfg.get(
+                "same_level_semantics", "preserve_factual"
+            )),
+            reference_K=int(recourse_cfg.reference_K),
+            disadvantaged_value=int(recourse_cfg.disadvantaged_value),
+            advantaged_value=int(recourse_cfg.advantaged_value),
             n_max=n_max,
+            rng_seed=int(cfg.seed),
         )
         all_stats[name] = stratify(results, disc_names, cont_names,
                                    mediator_specs, n_boot=int(recourse_cfg.n_boot))
@@ -557,10 +772,13 @@ def main(cfg):
     tex = make_recourse_table(
         all_stats, model_names, disc_names, cont_names, mediator_specs,
         caption=(
-            f"Minimum-cost counterfactual recourse for {dataset_name} true negatives "
-            r"($y{=}0$, $\hat{y}{=}0$). "
-            r"$\lambda = \lambda_{\mathrm{EB}} = |\mathrm{NDE}|/|\mathrm{NIE}|$ "
-            r"per model. "
+            f"Recourse for disadvantaged-group {dataset_name} true negatives. "
+            rf"Objective weights: $\eta={eta:g}$, "
+            rf"$\lambda={lambda_invariance:g}$, $\rho={rho_anchor:g}$. "
+            rf"Direct actions propagate strict descendants using "
+            rf"$K={int(recourse_cfg.get('intervention_K', 32))}$ draws; "
+            r"transport is an independent-coupling upper bound. "
+            r"$D_{\rm post}$ is a direct plug-in post-recourse mediated disparity. "
             r"Values: mean with 95\% bootstrap CI."
         ),
         label=f"tab:{dataset_name}_recourse",

@@ -1,203 +1,247 @@
-This repository accompanies the paper *From "What if" to "How to": Mediation-Aware Causal Recourse via the Standard Fairness Model*, and implements a framework for generating algorithmic recourse recommendations that are both causally grounded and equitable across sensitive subgroups, given a fixed predictive model.
+# Mediation-aware causal recourse
 
-## Overview
+Research code for diagnosing whether classifier-satisfying recourse closes or
+widens a disparity carried through actionable mediators. The estimands in this
+repository are effects on a fixed classifier `f_hat`, not effects on the
+observed outcome `Y`.
 
-Standard algorithmic recourse asks how an individual can change their features to flip an unfavorable decision. When the predictor exhibits group-level disparities, however, recourse generated without reference to causal structure can entrench those disparities, recommending changes along pathways that are immutable in practice, or ignoring the mechanism by which the disparity arises in the first place.
+## Important revision note
 
-We address this by embedding recourse in the Standard Fairness Model (SFM) of Plečko and Bareinboim, which partitions covariates into a sensitive attribute $X$, confounders $Z$, and mediators $W$.
+The current source corrects four errors in the original experiment code:
 
-## Datasets
+- the old `NIE_post` was `f_hat(1,w',z)-f_hat(0,w',z)`, a pointwise direct
+  effect. It is now a separately named direct-gap diagnostic;
+- the old “lambda sweep” varied only the shortfall weight `eta`. The revised
+  ablation varies `eta`, the invariance weight `lambda`, and the distributional
+  anchor weight `rho` independently;
+- the old flow checkpoint used conditionally independent discrete heads and did
+  not condition the continuous flow on the discrete mediators. New training is
+  ordered in explicit causal blocks; and
+- the old recourse grid jointly fixed every mediator coordinate. Direct actions
+  now clamp only selected coordinates and regenerate strict descendants through
+  the learned mechanisms.
 
-The repository illustrates the use of this pipeline on two datasets:
+Existing checkpoints remain loadable for reproducibility, but submission
+results must be regenerated from Stage 1 onward. Existing legacy tables should
+not be cited as revised results.
 
-- **Law School**: `race` is selected as the sensitive attribute, `LSAT` and undergraduate `GPA` as mediators, and bar passage (`bar_pass`) as the outcome.
-- **Folktables ACSIncome (California, 2018)**: `SEX` is selected as the sensitive attribute, education group (`SCHL_GRP`), occupation group (`OCCP_GRP`), and weekly hours worked (`WKHP`) as mediators, and income above \$50k as the outcome.
-
-## Installation
+## Setup
 
 ```bash
-# Install all dependencies. PyTorch is pinned to a CUDA 12.8 build in
-# pyproject.toml / uv.lock — cu128 ships the sm_120 kernels required by
-# Blackwell / RTX 50-series GPUs (e.g. RTX 5090).
 uv sync
 ```
 
-> Need a different CUDA build or a CPU-only install? Repoint `torch`/`torchvision`
-> in `[tool.uv.sources]` (`pyproject.toml`) to another `pytorch-*` index — e.g.
-> `pytorch-cpu` or `pytorch-cu126` — then re-run `uv lock && uv sync`. Run
-> `nvidia-smi` to check your driver's CUDA version.
-
-All commands below are prefixed with `uv run`, which executes them inside the
-uv-managed environment — you do **not** need to activate the venv first. (If you
-prefer, you can `source .venv/bin/activate` once and drop the `uv run` prefix.)
+All configuration is under `dataset.*`; for example,
+`dataset.recourse.reference_K=500`.
 
 ## Pipeline
 
-The implementation is organised as a five-stage pipeline. All entry points are run as Python modules from the project root via `uv run` and are driven by [Hydra](https://hydra.cc/) configs in `conf/dataset/`. Switch datasets by passing `dataset=bar` instead of the default `dataset=acs`.
+### 1. Train the mediator model
 
-### Stage 1 — Flow training: $\Pr(W \mid X, Z)$
+The revised mixed model uses configured partially ordered blocks. For ACS:
 
-Trains a mixed-type conditional normalising flow that factorises as
-
-$$\Pr(W \mid X, Z) = \Pr(W_d \mid X, Z) \cdot \Pr(W_c \mid W_d, X, Z)$$
-
-with a categorical MLP head for discrete mediators and a Neural Spline Flow for the continuous component.
-
-```bash
-uv run python -m flows.train_flow                        # ACS (default)
-uv run python -m flows.train_flow dataset=bar            # Law School
-uv run python -m flows.train_flow dataset=acs dataset.loader.kwargs.year=2019
-uv run python -m flows.train_flow dataset=acs dataset.flow.max_epochs=200
+```text
+p(Education,Occupation,Hours | X,Z)
+  = p(Education | X,Z)
+    p(Occupation | Education,X,Z)
+    p(Hours | Education,Occupation,X,Z).
 ```
 
-**Outputs:** `outputs/flows/{acs,law_school}/flow_models.pt`, `outputs/data/{acs,bar}_tensors.pt`
-
----
-
-### Stage 2 — Outcome model training: $\Pr(Y \mid X, W, Z)$
-
-Fits two outcome models (logistic regression and MLP) on the training split and evaluates them on the validation split, stratified by the sensitive attribute.
+For Law School, `[LSAT,GPA]` is one unordered block modeled by one multivariate
+conditional flow, `p(LSAT,GPA | X,Z)`. The autoregressive coordinate transform
+inside that flow is only a density parameterization; it is not interpreted as
+an LSAT-to-GPA or GPA-to-LSAT causal arrow. `sfm.mediator_layers` records these
+assumptions and is saved in new checkpoints.
 
 ```bash
-uv run python -m outcome.train_outcome                   # ACS (default)
+uv run python -m flows.train_flow
+uv run python -m flows.train_flow dataset=bar
+# Simpler conditional-Gaussian ablation (use a separate checkpoint):
+uv run python -m flows.train_flow dataset.flow.continuous_family=gaussian \
+  dataset.paths.flows=outputs/flows/acs/gaussian_models.pt
+```
+
+Outputs are written to `outputs/flows/` and `outputs/data/`.
+
+### 2. Train fixed outcome classifiers
+
+The Bar Passage configuration fits logistic regression, an MLP, and a
+random-forest robustness model. ACS currently fits logistic regression and an
+MLP.
+
+```bash
+uv run python -m outcome.train_outcome
 uv run python -m outcome.train_outcome dataset=bar
 ```
 
-**Outputs:** `outputs/outcome/{acs,bar}/{logreg,mlp}.joblib`
+### 3. Estimate classifier-scale mediation effects
 
----
+For `mu_ab(z) = E[f_hat(x=a,W_x=b,z) | Z=z]`, the code reports
 
-### Stage 3 — Mediation decomposition: NDE and NIE
+```text
+pure NDE    = mu_10 - mu_00
+pure NIE    = mu_01 - mu_00
+total NDE   = mu_11 - mu_01
+total NIE   = mu_11 - mu_10
+TE          = mu_11 - mu_00
+interaction = mu_11 - mu_10 - mu_01 + mu_00.
+```
 
-Estimates the Natural Direct Effect (NDE) and Natural Indirect Effect (NIE) of the sensitive attribute on the outcome using self-normalised importance sampling over exact flow log-densities:
-
-$$\mathrm{NDE}_i = \mathbb{E}_k\bigl[f(X{=}1,\,W_k,\,z_i) - f(X{=}0,\,W_k,\,z_i)\bigr], \quad W_k \sim \Pr(W \mid X{=}0,\,z_i)$$
-
-$$\mathrm{NIE}_i = \sum_k \bar{r}_k\,f(X{=}0,W_k,z_i) - \mathbb{E}_k\bigl[f(X{=}0,W_k,z_i)\bigr], \quad \bar{r}_k \propto \frac{\Pr(W_k \mid X{=}1,\,z_i)}{\Pr(W_k \mid X{=}0,\,z_i)}$$
-
-The empirical calibration $\lambda_{\mathrm{EB}} = |\mathrm{NDE}| / |\mathrm{NIE}|$ is saved to JSON for use in the recourse stage.
+`TE` is sampled directly. The implementation does not assume `TE=NDE+NIE`.
+Both mediator distributions are sampled directly; no importance weights are
+reused.
 
 ```bash
-uv run python -m evaluation.estimate_gap                 # ACS (default)
-uv run python -m evaluation.estimate_gap dataset=bar
-uv run python -m evaluation.estimate_gap dataset=acs gap.K=1000 gap.n_inst=1000
+uv run python -m evaluation.estimate_gap
+uv run python -m evaluation.estimate_gap dataset.gap.K=1000 dataset.gap.n_inst=1000
 ```
 
-**Outputs:** `outputs/gaps/{acs,bar}_gender_gap.{json,txt}`, LaTeX tables in `outputs/gaps/`
+The JSON output includes NDE, NIE, TE, the interaction residual,
+`|NIE/TE|`, and `|NDE/NIE|`. The last quantity is explicitly labelled an
+effect-ratio heuristic; it is not called empirical Bayes and is not the default
+objective weight.
 
----
+### 4. Generate recourse
 
-### Stage 4 — Recourse generation
+Only disadvantaged-group true negatives receive recourse. Each candidate is a
+direct action plan `a`, not a joint setting of every mediator. Acted
+coordinates are clamped, strict descendants are drawn ancestrally, and
+non-descendants remain factual. The objective is
 
-For each true-negative individual ($y=0$, $\hat{y}=0$), finds the minimum-cost mediator intervention $w'$ subject to a soft local-fairness-invariance constraint:
+```text
+cost(a)
++ eta    * E_Qa[classifier_shortfall(W)]
++ lambda * E_Qa[|f_hat(1,W,z)-f_hat(0,W,z)|]
++ rho    * U_mix(Qa, P(W | X=advantaged,z)).
+```
 
-$$\min_{w'}\; \mathrm{cost}(w, w') + \lambda \cdot S(w')$$
-
-$$S(w') = \max(0,\,\tau{-}\nu - f(x_i, w', z_i)) + \max(0,\,\tau{-}\nu - f(1{-}x_i, w', z_i))$$
-
-The penalty weight defaults to $\lambda = \lambda_{\mathrm{EB}}$ loaded from the gap JSON. Candidate generation is fully vectorised: all mediator combinations are enumerated via a Cartesian grid and evaluated in two bulk `predict_proba` calls per individual.
+`U_mix` is expected categorical-Hamming/normalized-L1 ground cost under an
+explicit independent empirical coupling. It is a computable upper bound on
+the joint mixed-metric Wasserstein distance, not the optimal joint transport
+itself. The exact mean marginal W1 is retained on each candidate as an
+additional diagnostic. The defaults are in the dataset YAML and can be
+overridden explicitly:
 
 ```bash
-uv run python -m evaluation.compute_recourse             # ACS, all TN individuals
-uv run python -m evaluation.compute_recourse dataset=bar
-uv run python -m evaluation.compute_recourse dataset=acs recourse.n_max=500
-uv run python -m evaluation.compute_recourse dataset=acs recourse.threshold=0.5 recourse.nu=0.1
+uv run python -m evaluation.compute_recourse \
+  dataset.recourse.eta=10 \
+  dataset.recourse.lambda_invariance=0 \
+  dataset.recourse.rho_anchor=0
 ```
 
-**Outputs:** `outputs/recourse/acs_recourse.{tex,txt}`
+Here `lambda=0,rho=0` is the standard minimum-cost actionable-recourse
+baseline and is explicitly labelled `ordinary_actionable_recourse` in the
+ablation outputs. `rho>0` activates the distributional-anchoring variant.
 
-#### Stage 4b — $\lambda$ sensitivity sweep
+For an intervention on one coordinate of an unordered same-level block, the
+default `same_level_semantics=preserve_factual` keeps the other coordinates at
+that individual's factual values. The optional `resample_marginal` mode draws
+the joint natural block and then overwrites the acted coordinates. Neither mode
+asserts causal order within the block.
 
-Sweeps $\lambda \in \{0,\,\lambda_{\mathrm{EB}}/4,\,\lambda_{\mathrm{EB}}/2,\,\lambda_{\mathrm{EB}},\,2\lambda_{\mathrm{EB}},\,4\lambda_{\mathrm{EB}},\,\infty\}$ on a subsample of true negatives. Uses PyTorch-accelerated inference (sklearn weights loaded into frozen `nn.Linear` / `nn.Sequential`) and caches the candidate pool to disk, so the sweep itself requires zero additional model evaluations.
+### 5. Run independent ablations
 
 ```bash
-uv run python -m evaluation.sweep_lambda                 # ACS, n=250 subsample
-uv run python -m evaluation.sweep_lambda dataset=bar
-uv run python -m evaluation.sweep_lambda dataset=acs recourse.sweep_n_max=500
-uv run python -m evaluation.sweep_lambda dataset=acs --config-name config recourse.nu=0.1
+uv run python -m evaluation.ablate_recourse
+# Backward-compatible command; now routes to the same corrected ablation:
+uv run python -m evaluation.sweep_lambda
 ```
 
-**Outputs:** `outputs/recourse/sweep_lambda_{slug}_{stratum}.tex`, `outputs/recourse/sweep_lambda_acs.txt`
+The Cartesian grids `eta_grid`, `lambda_grid`, and `rho_grid` are configured
+independently. Outputs are JSON, CSV, and LaTeX tables under
+`outputs/recourse/ablation_*`. If available, `|NDE/NIE|` is inserted as a
+marked heuristic lambda row, not used as a calibration.
 
----
+## Post-recourse estimand
 
-### Stage 5 — Evaluation
+For recipient confounders `Z_R`, the reported post-recourse mediated disparity
+is
 
-Post-recourse NIE ($\mathrm{NIE}_{\mathrm{post}}$) is computed at the selected recourse solution $w'_i$ and reported alongside cost, shortfall, and feasibility rate in the tables produced by Stages 4 and 4b:
+```text
+D_post = E_{Z_R}[ E_{W~P(W|X=advantaged,Z)} f_hat(X=disadvantaged,W,Z)
+                  - E_{W~Q_a(.|Z)} f_hat(X=disadvantaged,W,Z) ].
+```
 
-$$\mathrm{NIE}_{\mathrm{post},i} = f(\text{Male},\,w'_i,\,z_i) - f(\text{Female},\,w'_i,\,z_i)$$
+The advantaged reference is sampled directly and is never sent through
+recourse. The code also reports two pre-recourse checks on the same recipients:
 
-All summary statistics are reported as means with 95% percentile bootstrap confidence intervals.
+- model-based `D_pre`, using direct draws from both natural mediator models;
+- factual plug-in `D_pre_factual`, replacing the disadvantaged natural
+  expectation with each recipient's observed mediator value.
 
----
+Thus the output states which population supplies `Z`, whether the reference is
+modified (it is not), and whether importance weights are reused (they are not).
+Because `D_post` compares a natural distribution with an intervention-induced
+one, it is not called a natural indirect effect.
 
-## Diagnostics (optional)
+The recipient-level percentage closed is descriptive and uses the recipients'
+observed pre-recourse state:
 
-The standalone scripts in `diagnostics/` are **not** part of the five-stage pipeline and nothing downstream imports them — they exist to sanity-check the model before/after the gap and recourse stages, regenerating the figures in `figures/`.
+```text
+factual closure = 1 - |mean(D_post)| / |mean(D_pre_factual)|.
+```
 
-**Flow diagnostics** inspect the trained conditional flow $\Pr(W \mid X, Z)$ from Stage 1: training curves, empirical-vs-model mediator marginals, the counterfactual shift $\Pr(W \mid X{=}1)$ vs $\Pr(W \mid X{=}0)$, and importance-sampling ESS by group (the IS quality that NDE/NIE in Stage 3 depends on).
+Model-based `D_pre` remains a natural-distribution mediation diagnostic, but is
+not used as the closure denominator after selecting recipients by their factual
+features and classifier decision.
+
+The conservative mixed-metric coupling bound is reported beside `D_post` at
+every ablation point so their association can be assessed directly.
+
+The causal interpretation still requires the stated graph, consistency,
+positivity, and no unmeasured mediator--outcome confounding after conditioning
+on `Z`. Assigning measured variables to the SFM `Z` set makes the adjustment
+set explicit; it does not by itself prove that no omitted confounders exist.
+
+## Synthetic validation and tests
+
+The synthetic SCM contains a known nonzero X-W interaction, so it tests both
+effect recovery and direct TE estimation:
 
 ```bash
-uv run python diagnostics/inspect_acs_model.py   # ACS flow        → figures/acs_income/
-uv run python diagnostics/inspect_bar_model.py   # Law School flow → figures/law_school/
+uv run python -m evaluation.synthetic_validation
+uv run python -m unittest discover -s tests -v
 ```
 
-Both accept `--model` / `--tensors` overrides; the defaults point at the Stage 1 outputs (`outputs/flows/.../flow_models.pt`, `outputs/data/..._tensors.pt`).
+## Uncertainty
 
-**Recourse-shift diagnostic** visualises, per mediator and per outcome model, three densities on the shared $Y{=}0$ evaluation cohort: $W \mid X{=}\text{advantaged}$ (natural reference), $W \mid X{=}\text{disadvantaged}$ (natural, pre-recourse), and $W' \mid X{=}\text{disadvantaged}$ (post-recourse at $\eta=\lambda_{\mathrm{EB}}$) — KDE for continuous mediators, grouped bars for discrete. It reuses the Stage-4b scored candidate cache, so it performs **no** model inference when that cache is present.
+The table intervals currently resample individuals while holding the fitted
+flow and classifier fixed. They are conditional, not full-pipeline uncertainty
+intervals. Submission experiments should additionally repeat data splitting,
+flow fitting, and classifier fitting across seeds and summarize variation
+across refits. The code and captions deliberately do not claim otherwise.
+
+The complete multi-seed runner isolates every seed's tensors and fitted models,
+then reports the mean, sample standard deviation, and range across refits:
 
 ```bash
-uv run python diagnostics/inspect_recourse_shift.py            # ACS → figures/acs_income/recourse_shift_{model}.png
-uv run python diagnostics/inspect_recourse_shift.py dataset=bar
+uv run python -m evaluation.run_multiseed \
+  --datasets bar acs --seeds 42 43 44 45 46 --resume
 ```
 
-Requires Stages 2–3 outputs (`outputs/outcome/<ds>/`, the gap JSON for $\lambda_{\mathrm{EB}}$); rebuilds the scored cache from the outcome model if it is absent.
+Per-seed artifacts and the combined `summary.{json,csv,md}` are written under
+`outputs/multiseed/`. `--resume` skips a stage only when its complete expected
+output set exists.
 
----
+## Datasets
 
-## Configuration
+- ACS Income (California 2018): sex is `X`; education, occupation, and weekly
+  hours are mediators.
+- Law School: race is `X`; LSAT and undergraduate GPA are mediators.
 
-Dataset-specific parameters live in `conf/dataset/acs.yaml` and `conf/dataset/bar.yaml`. Any field can be overridden at the command line using Hydra dot-notation:
+For both supplied configurations, value 0 is the disadvantaged group and value
+1 is the advantaged natural reference. These values are explicit YAML fields.
 
-```bash
-# Change ACS survey year and states
-uv run python -m flows.train_flow dataset.loader.kwargs.year=2019 dataset.loader.kwargs.states=[CA,NY,TX]
+## Repository layout
 
-# Increase IS samples for the gap decomposition
-uv run python -m evaluation.estimate_gap gap.K=1000 gap.n_inst=2000 gap.n_boot=5000
-
-# Tighter recourse threshold with more bootstrap iterations
-uv run python -m evaluation.compute_recourse recourse.threshold=0.6 recourse.nu=0.05 recourse.n_boot=2000
-```
-
-## Project structure
-
-```
-conf/
-  config.yaml              # Hydra root config
-  dataset/
-    acs.yaml               # ACS Income dataset config
-    bar.yaml               # Law School dataset config
-data/
-  build_tensors.py         # Generic build_tensors, stack_sfm_features
-  acs.py                   # load_acs_income
-  bar.py                   # load_bar_data
-flows/
-  models.py                # DiscreteMediator, ContinuousMediatorFlow, load_flow_models
-  train_flow.py            # Stage 1 entry point
-  diagnostics.py           # make_sample_fns (IS sampling closures)
-outcome/
-  models.py                # _SFMPreprocess, TorchLogReg, TorchMLP, make_preprocessor
-  train_outcome.py         # Stage 2 entry point
-evaluation/
-  estimate_gap.py          # Stage 3 entry point
-  compute_recourse.py      # Stage 4 entry point
-  sweep_lambda.py          # Stage 4b entry point
-diagnostics/               # Optional inspection scripts (not in the pipeline)
-  inspect_acs_model.py     # ACS flow diagnostics       → figures/acs_income/
-  inspect_bar_model.py     # Law School flow diagnostics → figures/law_school/
-  inspect_recourse_shift.py   # Pre/post-recourse W shift vs advantaged ref
-  flow_diagnostics_shared.py  # Shared plot helpers (ESS, conditional marginals)
-  flow_diagnostics.py      # Standalone marginal/ESS plot helpers
-  paper_style.py           # Matplotlib/seaborn paper styling
+```text
+flows/                         block-ordered mediator model and interventions
+outcome/                       fixed logistic/MLP classifiers
+evaluation/estimate_gap.py     direct mediation decomposition
+evaluation/compute_recourse.py primary recourse experiment
+evaluation/ablate_recourse.py  eta x lambda x rho ablation
+evaluation/recourse_metrics.py estimands and mixed-type metric
+evaluation/synthetic_validation.py
+tests/test_core.py
+conf/dataset/                  dataset and experiment configuration
 ```

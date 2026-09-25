@@ -4,6 +4,7 @@ outcome/train_outcome.py — Generic Hydra entry point for outcome model trainin
 Run: python -m outcome.train_outcome [dataset=acs|bar]
 """
 
+import json
 import os
 import warnings
 warnings.filterwarnings("ignore")
@@ -15,6 +16,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
 
 import hydra
 from omegaconf import OmegaConf
@@ -38,6 +40,7 @@ def _evaluate(pipe, feat, y, X_raw, label: str, sensitive_col: int = 0,
     grp = X_raw[:, sensitive_col].astype(int)
     if group_labels is None:
         group_labels = {0: "Group 0", 1: "Group 1"}
+    groups = {}
     for g, name in group_labels.items():
         m = grp == g
         if m.sum() < 2:
@@ -47,6 +50,14 @@ def _evaluate(pipe, feat, y, X_raw, label: str, sensitive_col: int = 0,
         g_pos = prob[m].mean()
         print(f"    {name:8s}  — acc={g_acc:.4f}  AUC={g_auc:.4f}  pred-pos={g_pos:.4f}"
               f"  (n={m.sum():,})")
+        groups[str(g)] = {
+            "label": str(name), "n": int(m.sum()), "accuracy": float(g_acc),
+            "auc": float(g_auc), "mean_predicted_probability": float(g_pos),
+        }
+    return {
+        "n": int(len(y)), "accuracy": float(acc), "auc": float(auc),
+        "mean_predicted_probability": float(pos_rt), "groups": groups,
+    }
 
 
 @hydra.main(config_path="../conf", config_name="config", version_base="1.1")
@@ -81,6 +92,8 @@ def main(cfg):
     save_dir = cfg.dataset.paths.outcome_dir
     os.makedirs(save_dir, exist_ok=True)
 
+    metrics = {"seed": int(cfg.seed), "dataset": str(cfg.dataset.name),
+               "models": {}}
     for spec in model_specs:
         name      = spec["name"]
         mtype     = spec["type"]
@@ -91,7 +104,7 @@ def main(cfg):
                 C=spec.get("C", 1.0),
                 max_iter=spec.get("max_iter", 1000),
                 solver="lbfgs",
-                random_state=42,
+                random_state=int(cfg.seed),
             )
             slug = "logreg"
         elif mtype == "mlp":
@@ -104,10 +117,21 @@ def main(cfg):
                 early_stopping=True,
                 validation_fraction=0.1,
                 n_iter_no_change=10,
-                random_state=42,
+                random_state=int(cfg.seed),
                 verbose=False,
             )
             slug = "mlp"
+        elif mtype == "random_forest":
+            clf = RandomForestClassifier(
+                n_estimators=int(spec.get("n_estimators", 300)),
+                max_depth=spec.get("max_depth"),
+                min_samples_leaf=int(spec.get("min_samples_leaf", 1)),
+                max_features=spec.get("max_features", "sqrt"),
+                class_weight=spec.get("class_weight"),
+                n_jobs=int(spec.get("n_jobs", -1)),
+                random_state=int(cfg.seed),
+            )
+            slug = "random_forest"
         else:
             raise ValueError(f"Unknown model type: {mtype}")
 
@@ -115,16 +139,28 @@ def main(cfg):
         pipe = Pipeline([("prep", prep), ("clf", clf)])
         pipe.fit(feat_tr, Y_tr)
 
-        _evaluate(pipe, feat_tr, Y_tr, X_tr.numpy(), f"{name} — train",
-                  sensitive_col=sensitive_col)
-        _evaluate(pipe, feat_va, Y_va, X_va.numpy(), f"{name} — val",
-                  sensitive_col=sensitive_col)
+        train_metrics = _evaluate(
+            pipe, feat_tr, Y_tr, X_tr.numpy(), f"{name} — train",
+            sensitive_col=sensitive_col,
+        )
+        val_metrics = _evaluate(
+            pipe, feat_va, Y_va, X_va.numpy(), f"{name} — val",
+            sensitive_col=sensitive_col,
+        )
 
         out_path = f"{save_dir}/{slug}.joblib"
         joblib.dump(pipe, out_path)
         print(f"  Saved → {out_path}")
+        metrics["models"][name] = {
+            "type": mtype, "slug": slug, "train": train_metrics,
+            "validation": val_metrics,
+        }
 
-    print(f"\nAll models saved → {save_dir}/")
+    metrics_path = f"{save_dir}/metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+
+    print(f"\nAll models and metrics saved → {save_dir}/")
 
 
 if __name__ == "__main__":

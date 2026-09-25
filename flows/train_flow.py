@@ -22,58 +22,99 @@ import hydra
 from omegaconf import OmegaConf
 
 from data.build_tensors import build_tensors
-from flows.models import DiscreteMediator, ContinuousMediatorFlow, combined_loss, evaluate
+from flows.models import (
+    ConditionalGaussian,
+    ContinuousMediatorFlow,
+    DiscreteMediator,
+    combined_loss,
+    evaluate,
+)
+from flows.schema import MediatorSchema
 
 
 @hydra.main(config_path="../conf", config_name="config", version_base="1.1")
 def main(cfg):
-    torch.manual_seed(42)
-    np.random.seed(42)
+    torch.manual_seed(int(cfg.seed))
+    np.random.seed(int(cfg.seed))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    # ── Dynamic data loading ──
-    loader_module = importlib.import_module(cfg.dataset.loader.module)
-    loader_fn = getattr(loader_module, cfg.dataset.loader.fn)
-    kwargs = OmegaConf.to_container(cfg.dataset.loader.kwargs, resolve=True)
-    # Convert lists to plain python lists (e.g., states)
-    df_raw = loader_fn(**kwargs)
-
     sfm_cfg = OmegaConf.to_container(cfg.dataset.sfm, resolve=True)
+    configured_layers = sfm_cfg.get("mediator_layers")
+    if configured_layers is None:
+        configured_layers = [[name] for name in sfm_cfg["mediators_disc"]]
+        if sfm_cfg["mediators_cont"]:
+            configured_layers.append(list(sfm_cfg["mediators_cont"]))
+        warnings.warn(
+            "No sfm.mediator_layers configured; using discrete singleton "
+            "layers followed by one joint continuous block.",
+            stacklevel=2,
+        )
+        sfm_cfg["mediator_layers"] = configured_layers
+    mediator_schema = MediatorSchema.build(
+        configured_layers,
+        sfm_cfg["mediators_disc"],
+        sfm_cfg["mediators_cont"],
+    )
     wc_clip = list(cfg.dataset.wc_clip) if cfg.dataset.wc_clip is not None else None
-
-    idx_tr, idx_val = train_test_split(np.arange(len(df_raw)), test_size=0.2, random_state=42)
-    df_tr  = df_raw.iloc[idx_tr].reset_index(drop=True)
-    df_val = df_raw.iloc[idx_val].reset_index(drop=True)
-
-    X_tr, Z_tr, Wd_tr, Wc_tr, Y_tr, scaler, vocab = build_tensors(
-        df_tr, sfm_cfg, fit_scaler=True, wc_clip=wc_clip
-    )
-    X_va, Z_va, Wd_va, Wc_va, Y_va, _, _ = build_tensors(
-        df_val, sfm_cfg, scaler=scaler, fit_scaler=False, wc_clip=wc_clip
-    )
+    flow_cfg = cfg.dataset.flow
+    tensors_path = cfg.dataset.paths.tensors
+    reuse_tensors = bool(flow_cfg.get("reuse_tensors", True))
+    if reuse_tensors and os.path.exists(tensors_path):
+        print(f"Reusing fixed data split from {tensors_path}")
+        saved = torch.load(tensors_path, map_location="cpu", weights_only=False)
+        X_tr, Z_tr, Wd_tr, Wc_tr, Y_tr = (
+            saved["X_tr"], saved["Z_tr"], saved["Wd_tr"], saved["Wc_tr"],
+            saved["Y_tr"],
+        )
+        X_va, Z_va, Wd_va, Wc_va, Y_va = (
+            saved["X_va"], saved["Z_va"], saved["Wd_va"], saved["Wc_va"],
+            saved["Y_va"],
+        )
+        scaler, vocab = saved["scaler"], saved["vocab"]
+    else:
+        loader_module = importlib.import_module(cfg.dataset.loader.module)
+        loader_fn = getattr(loader_module, cfg.dataset.loader.fn)
+        kwargs = OmegaConf.to_container(cfg.dataset.loader.kwargs, resolve=True)
+        df_raw = loader_fn(**kwargs)
+        idx_tr, idx_val = train_test_split(
+            np.arange(len(df_raw)), test_size=0.2, random_state=int(cfg.seed)
+        )
+        df_tr = df_raw.iloc[idx_tr].reset_index(drop=True)
+        df_val = df_raw.iloc[idx_val].reset_index(drop=True)
+        X_tr, Z_tr, Wd_tr, Wc_tr, Y_tr, scaler, vocab = build_tensors(
+            df_tr, sfm_cfg, fit_scaler=True, wc_clip=wc_clip
+        )
+        X_va, Z_va, Wd_va, Wc_va, Y_va, _, _ = build_tensors(
+            df_val, sfm_cfg, scaler=scaler, fit_scaler=False, wc_clip=wc_clip
+        )
 
     dim_x  = X_tr.shape[1]
     dim_z  = Z_tr.shape[1]
     dim_wc = Wc_tr.shape[1]
     dim_wd = Wd_tr.shape[1]
 
-    print(f"Train: {len(df_tr):,}  Val: {len(df_val):,}")
+    print(f"Train: {len(X_tr):,}  Val: {len(X_va):,}")
     print(f"dim_x={dim_x}  dim_z={dim_z}  dim_W_disc={dim_wd}  dim_W_cont={dim_wc}")
     print(f"Vocab: {vocab}")
 
     # ── Models ──
-    flow_cfg = cfg.dataset.flow
     g_phi = DiscreteMediator(
         dim_x, dim_z, vocab,
         hidden_dim=flow_cfg.hidden_dim,
         n_layers=flow_cfg.n_layers,
+        autoregressive=bool(flow_cfg.get("disc_autoregressive", True)),
+        embed_dim=int(flow_cfg.get("disc_embed_dim", flow_cfg.embed_dim)),
+        layers=mediator_schema.discrete_layers,
     ).to(device)
-    # vocab={} → flow conditions only on (X, Z), not on discrete mediator
-    # embeddings to avoid the chicken-and-egg deadlock.
-    f_theta = ContinuousMediatorFlow(
-        dim_wc=dim_wc, dim_x=dim_x, dim_z=dim_z, vocab={},
+    continuous_family = str(flow_cfg.get("continuous_family", "spline"))
+    continuous_cls = (ConditionalGaussian if continuous_family == "gaussian"
+                      else ContinuousMediatorFlow)
+    condition_on_disc = bool(flow_cfg.get("condition_cont_on_disc", True))
+    continuous_vocab = vocab if condition_on_disc else {}
+    f_theta = continuous_cls(
+        dim_wc=dim_wc, dim_x=dim_x, dim_z=dim_z, vocab=continuous_vocab,
         embed_dim=flow_cfg.embed_dim,
         hidden_features=flow_cfg.hidden_features,
         n_flow_layers=flow_cfg.n_flow_layers,
@@ -179,18 +220,29 @@ def main(cfg):
 
     # ── Save ──
     flows_path = cfg.dataset.paths.flows
-    tensors_path = cfg.dataset.paths.tensors
     os.makedirs(os.path.dirname(flows_path), exist_ok=True)
     torch.save({
         "g_phi_state":   g_phi.state_dict(),
         "f_theta_state": f_theta.state_dict(),
-        "g_phi_cfg":     dict(dim_x=dim_x, dim_z=dim_z, vocab=vocab),
+        "continuous_family": continuous_family,
+        "g_phi_cfg":     dict(
+            dim_x=dim_x, dim_z=dim_z, vocab=vocab,
+            hidden_dim=flow_cfg.hidden_dim, n_layers=flow_cfg.n_layers,
+            autoregressive=bool(flow_cfg.get("disc_autoregressive", True)),
+            embed_dim=int(flow_cfg.get("disc_embed_dim", flow_cfg.embed_dim)),
+            layers=[list(block) for block in mediator_schema.discrete_layers],
+        ),
         "f_theta_cfg":   dict(
-            dim_wc=dim_wc, dim_x=dim_x, dim_z=dim_z, vocab={},
+            dim_wc=dim_wc, dim_x=dim_x, dim_z=dim_z, vocab=continuous_vocab,
+            embed_dim=flow_cfg.embed_dim,
+            hidden_features=flow_cfg.hidden_features,
+            n_flow_layers=flow_cfg.n_flow_layers,
+            n_blocks=flow_cfg.n_blocks,
             num_bins=flow_cfg.num_bins, tail_bound=flow_cfg.tail_bound,
         ),
         "scaler":        scaler,
         "sfm_cfg":       sfm_cfg,
+        "mediator_layers": [list(block) for block in mediator_schema.layers],
         "best_val_nll":  best_val,
         "best_epoch":    best_state["epoch"],
         "history":       history,

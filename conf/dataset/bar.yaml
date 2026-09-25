@@ -11,13 +11,20 @@ sfm:
   confounders: [gender, fam_inc]
   mediators_disc: []
   mediators_cont: [lsat, gpa]
+  mediator_layers:
+    - [lsat, gpa]
   outcome: bar_pass
 
 wc_clip: null
 
 flow:
+  continuous_family: spline
+  condition_cont_on_disc: true
+  reuse_tensors: true
   hidden_dim: 64
   n_layers: 2
+  disc_autoregressive: true
+  disc_embed_dim: 4
   embed_dim: 4
   hidden_features: 64
   n_flow_layers: 4
@@ -44,6 +51,12 @@ outcome:
       type: mlp
       hidden_layer_sizes: [64, 32]
       max_iter: 500
+    - name: "Random Forest"
+      type: random_forest
+      n_estimators: 300
+      min_samples_leaf: 20
+      max_features: sqrt
+      n_jobs: -1
 
 gap:
   K: 500
@@ -51,8 +64,22 @@ gap:
   n_boot: 2000
 
 recourse:
+  # LSAT and GPA form one unordered joint block. An intervention on one keeps
+  # the individual's other coordinate fixed (no within-block causal arrow).
+  propagate_descendants: true
+  intervention_K: 32
+  same_level_semantics: preserve_factual
   threshold: 0.5
   nu: 0.05
+  eta: 10.0
+  lambda_invariance: 0.0
+  rho_anchor: 0.0
+  disadvantaged_value: 0
+  advantaged_value: 1
+  reference_K: 200
+  eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
+  rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
   n_max: 0
   n_boot: 1000
   sweep_n_max: 250
@@ -61,7 +88,8 @@ recourse:
       display: "$\\Delta\\mathrm{LSAT}$"
       type: continuous
       actionable: monotone_up
-      clip: [120.0, 180.0]
+      # 1991 LSAC/fairml scale used by data/bar.csv.
+      clip: [11.0, 48.0]
       step: 1.0
     gpa:
       display: "$\\Delta\\mathrm{GPA}$"

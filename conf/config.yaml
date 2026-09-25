@@ -2,6 +2,8 @@ defaults:
   - dataset: acs
   - _self_
 
+seed: 42
+
 hydra:
   run:
     dir: .

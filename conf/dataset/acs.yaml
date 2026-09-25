@@ -13,14 +13,23 @@ sfm:
   confounders: [AGEP, POBP_US]
   mediators_disc: [SCHL_GRP, OCCP_GRP]
   mediators_cont: [WKHP]
+  mediator_layers:
+    - [SCHL_GRP]
+    - [OCCP_GRP]
+    - [WKHP]
   outcome: income
 
 # Clip all Wc columns before QuantileTransformer (null = no clip)
 wc_clip: [1.0, 60.0]
 
 flow:
+  continuous_family: spline
+  condition_cont_on_disc: true
+  reuse_tensors: true
   hidden_dim: 64
   n_layers: 2
+  disc_autoregressive: true
+  disc_embed_dim: 4
   embed_dim: 4
   hidden_features: 64
   n_flow_layers: 4
@@ -55,8 +64,22 @@ gap:
   n_boot: 2000
 
 recourse:
+  # Direct actions clamp only selected mediators; strict descendants are
+  # regenerated through the ordered mechanisms.
+  propagate_descendants: true
+  intervention_K: 32
+  same_level_semantics: preserve_factual
   threshold: 0.5
   nu: 0.05
+  eta: 10.0
+  lambda_invariance: 0.0
+  rho_anchor: 0.0
+  disadvantaged_value: 0
+  advantaged_value: 1
+  reference_K: 200
+  eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
+  rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
   n_max: 0        # 0 = all TN individuals
   n_boot: 1000
   sweep_n_max: 250

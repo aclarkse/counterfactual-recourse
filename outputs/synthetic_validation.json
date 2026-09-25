@@ -1,0 +1,36 @@
+{
+  "n": 1000,
+  "K": 2000,
+  "seed": 42,
+  "estimand": "classifier/structural-score scale",
+  "parameters": {
+    "alpha": 0.8,
+    "gamma": 0.5,
+    "sigma": 1.0,
+    "beta_x": 0.3,
+    "beta_w": 0.4,
+    "beta_xw": 0.25
+  },
+  "effects": {
+    "nde": {
+      "truth": 0.2963885562028736,
+      "estimate": 0.29643379309773443,
+      "absolute_error": 4.5236894860856136e-05
+    },
+    "nie": {
+      "truth": 0.32000000000000006,
+      "estimate": 0.31916882917284967,
+      "absolute_error": 0.0008311708271503959
+    },
+    "te": {
+      "truth": 0.8163885562028736,
+      "estimate": 0.8150831312835216,
+      "absolute_error": 0.0013054249193520384
+    },
+    "interaction": {
+      "truth": 0.1963885562028736,
+      "estimate": 0.19948050878942014,
+      "absolute_error": 0.0030919525865465425
+    }
+  }
+}

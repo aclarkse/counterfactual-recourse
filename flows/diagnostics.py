@@ -4,22 +4,17 @@ flows/diagnostics.py — Sampling and log-prob closures for flow models.
 Used by evaluation/estimate_gap.py.
 """
 
-import numpy as np
 import torch
 
 
 def make_sample_fns(g_phi, f_theta, scaler, device):
     """Return (sample_w_given_xz, log_prob_w_given_xz) closures."""
 
-    WKHP_CLIP = (1, 60)
-
     def _to_original_scale(w_cont: torch.Tensor) -> torch.Tensor:
-        """Invert QuantileTransform → clip to WKHP_CLIP → round to nearest hour."""
+        """Invert the training transform without dataset-specific rounding."""
         if scaler is None or w_cont.shape[1] == 0:
             return w_cont
-        arr = scaler.inverse_transform(w_cont.numpy())
-        arr = np.clip(arr, *WKHP_CLIP)
-        arr = np.round(arr).astype(np.float32)
+        arr = scaler.inverse_transform(w_cont.numpy()).astype("float32")
         return torch.tensor(arr)
 
     @torch.no_grad()

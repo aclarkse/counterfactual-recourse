@@ -162,4 +162,12 @@ def build_torch_pipeline(pipe) -> nn.Module:
     """
     prep = pipe.named_steps["prep"]
     clf  = pipe.named_steps["clf"]
-    return TorchMLP(prep, clf) if hasattr(clf, "coefs_") else TorchLogReg(prep, clf)
+    if hasattr(clf, "coefs_"):
+        return TorchMLP(prep, clf)
+    if hasattr(clf, "coef_"):
+        return TorchLogReg(prep, clf)
+    raise TypeError(
+        f"PyTorch conversion is not implemented for {type(clf).__name__}. "
+        "Use descendant-propagating recourse, which evaluates the fitted "
+        "sklearn classifier directly."
+    )
