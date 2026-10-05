@@ -15,3 +15,12 @@ MLP (64--32) (n=500)
   X-W interaction residual: +0.0245
   addressability |NIE/TE|: 0.088
   effect-ratio heuristic |NDE/NIE|: 8.994
+
+Random Forest (n=500)
+  observed prediction gap: +0.1003
+  pure NDE: +0.0579 [+0.0553, +0.0603]
+  pure NIE: -0.0018 [-0.0040, +0.0005]
+  total effect (direct): +0.0709 [+0.0670, +0.0748]
+  X-W interaction residual: +0.0148
+  addressability |NIE/TE|: 0.025
+  effect-ratio heuristic |NDE/NIE|: 32.346

@@ -97,6 +97,54 @@
           }
         }
       }
+    },
+    "Random Forest": {
+      "type": "random_forest",
+      "slug": "random_forest",
+      "train": {
+        "n": 241218,
+        "accuracy": 0.8014244376456152,
+        "auc": 0.8875762193286577,
+        "mean_predicted_probability": 0.4400635502269872,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 115259,
+            "accuracy": 0.810869433189599,
+            "auc": 0.8912597719844376,
+            "mean_predicted_probability": 0.3871600961298313
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 125959,
+            "accuracy": 0.7927817781976675,
+            "auc": 0.8805518409795654,
+            "mean_predicted_probability": 0.48847294706075123
+          }
+        }
+      },
+      "validation": {
+        "n": 60305,
+        "accuracy": 0.7941132576071636,
+        "auc": 0.8784223525825863,
+        "mean_predicted_probability": 0.4424358551912697,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 28962,
+            "accuracy": 0.8047441475036254,
+            "auc": 0.8834123706261823,
+            "mean_predicted_probability": 0.39031026952573644
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 31343,
+            "accuracy": 0.7842899530995756,
+            "auc": 0.8699504654607055,
+            "mean_predicted_probability": 0.4906016725043914
+          }
+        }
+      }
     }
   }
 }

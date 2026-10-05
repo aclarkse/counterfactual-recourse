@@ -54,6 +54,31 @@ Reference-valid: 21.6% ± 5.4%; valid-action coverage: 99.1% ± 1.1%; median min
 | 0.400 | 96.7% ± 2.6% |
 | 0.500 | 98.6% ± 1.7% |
 
+### Random Forest
+
+| Method | Post disparity | Recipient L1 closure | Overshoot | Constraint feasible | Cost | Paired absolute-gap gain |
+|---|---:|---:|---:|---:|---:|---:|
+| ordinary actionable recourse | -0.203 ± 0.017 | -2.019 ± 10.697% | 84.400 ± 4.118% | 98.720 ± 1.145% | 1.004 ± 0.141 | 0.000 ± 0.000 |
+| mediation aware recourse | 0.112 ± 0.018 | 32.999 ± 8.968% | 16.320 ± 4.180% | 26.000 ± 6.835% | 0.269 ± 0.032 | 0.072 ± 0.018 |
+
+Validation AUC: 0.880 ± 0.001; pure NIE: +0.013 ± 0.012; TE: +0.086 ± 0.013.
+
+Constraint compatibility diagnostics:
+
+Reference-valid: 21.6% ± 7.7%; valid-action coverage: 98.7% ± 1.1%; median minimum attainable W1: 0.150 ± 0.014.
+
+| Epsilon | Joint coverage |
+|---:|---:|
+| 0.025 | 0.0% ± 0.0% |
+| 0.050 | 2.2% ± 1.6% |
+| 0.075 | 11.7% ± 6.4% |
+| 0.100 | 26.0% ± 6.8% |
+| 0.150 | 49.8% ± 6.4% |
+| 0.200 | 70.2% ± 3.5% |
+| 0.300 | 84.1% ± 2.1% |
+| 0.400 | 96.7% ± 2.2% |
+| 0.500 | 98.7% ± 1.1% |
+
 ## ADULT
 
 ### Logistic Reg.

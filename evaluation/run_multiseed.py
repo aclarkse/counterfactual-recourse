@@ -31,7 +31,7 @@ MODEL_SPECS = {
     },
 }
 DATASET_MODELS = {
-    "acs": ("Logistic Reg.", "MLP (64--32)"),
+    "acs": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "adult": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "bar": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "german": ("Logistic Reg.", "Random Forest"),
@@ -674,6 +674,9 @@ def main() -> None:
             for seed in args.seeds:
                 run_seed(dataset, seed, args.root, args.resume,
                          only_stage=args.only_stage)
+    if args.only_stage not in (None, "recourse"):
+        # Downstream artifacts may not exist yet; aggregate after recourse.
+        return
     summary = collect(args.root, args.datasets, args.seeds)
     write_summary(summary, args.root)
     print(f"\nAggregate results written to {args.root / 'summary.md'}")

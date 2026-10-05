@@ -72,6 +72,13 @@ outcome:
       type: mlp
       hidden_layer_sizes: [64, 32]
       max_iter: 500
+    # Same hyperparameters as the other datasets' random forests.
+    - name: "Random Forest"
+      type: random_forest
+      n_estimators: 300
+      min_samples_leaf: 20
+      max_features: sqrt
+      n_jobs: -1
 
 gap:
   K: 500
