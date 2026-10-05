@@ -4,25 +4,27 @@ loader:
   module: data.acs
   fn: load_acs_income
   kwargs:
-    year: 2018
-    states: [CA]
+    year: 2019
+    states: [CA, NY]
     threshold: 50000
 
 sfm:
   sensitive: [SEX]
   confounders: [AGEP, POBP_US]
+  standardize_confounders: [AGEP]
   mediators_disc: [SCHL_GRP, OCCP_GRP]
-  mediators_cont: [WKHP]
+  mediators_cont: [WKHP, WKWN]
   mediator_layers:
     - [SCHL_GRP]
     - [OCCP_GRP]
-    - [WKHP]
+    - [WKHP, WKWN]
   outcome: income
 
 # Clip all Wc columns before QuantileTransformer (null = no clip)
 wc_clip: [1.0, 60.0]
 
 flow:
+  artifact_version: acs_2019_ca_ny_joint_labor_v1
   continuous_family: spline
   condition_cont_on_disc: true
   reuse_tensors: true
@@ -40,6 +42,19 @@ flow:
   max_epochs: 100
   lr: 0.001
   patience: 10
+  checkpoint_selection:
+    posterior_predictive: true
+    samples_per_context: 8
+    max_rows: 4096
+    min_group_rows: 200
+    ordered_mediators: []
+    max_overall_marginal_tv: 0.075
+    max_group_marginal_tv: 0.10
+    max_ordered_wasserstein: 0.0
+    max_overall_continuous_w1: 0.12
+    max_group_continuous_w1: 0.30
+    max_continuous_correlation_error: 0.10
+    score_weight: 1.0
 
 outcome:
   # Preprocessing per column in [X | Z | Wd | Wc_natural] order
@@ -47,7 +62,7 @@ outcome:
     X: [passthrough]              # SEX
     Z: [scale, passthrough]       # AGEP→scale, POBP_US→passthrough
     Wd: [ohe, ohe]                # SCHL_GRP, OCCP_GRP
-    Wc: [scale]                   # WKHP natural units
+    Wc: [scale, scale]            # WKHP and WKWN natural units
   models:
     - name: "Logistic Reg."
       type: logreg
@@ -80,6 +95,12 @@ recourse:
   eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
   lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
   rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+  constrained_recourse:
+    enabled: true
+    min_success_probability: 0.8
+    max_outcome_wasserstein: 0.1
+    epsilon_diagnostic_grid: [0.025, 0.05, 0.075, 0.1, 0.15, 0.2,
+                              0.3, 0.4, 0.5]
   n_max: 0        # 0 = all TN individuals
   n_boot: 1000
   sweep_n_max: 250
@@ -97,7 +118,13 @@ recourse:
       type: continuous
       actionable: monotone_up
       clip: [1.0, 60.0]
-      step: 0.5
+      step: 5.0
+    WKWN:
+      display: "$\\Delta\\mathrm{WKWN}$ (wk/yr)"
+      type: continuous
+      actionable: monotone_up
+      clip: [1.0, 52.0]
+      step: 4.0
 
 paths:
   tensors: outputs/data/acs_tensors.pt
@@ -105,4 +132,4 @@ paths:
   outcome_dir: outputs/outcome/acs
   gaps_dir: outputs/gaps
   recourse_dir: outputs/recourse
-  figures_dir: figures/acs_income
+  figures_dir: figures/acs_income_2019_ca_ny

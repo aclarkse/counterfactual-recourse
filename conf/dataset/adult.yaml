@@ -1,0 +1,128 @@
+name: adult
+
+loader:
+  module: data.adult
+  fn: load_adult_income
+  kwargs:
+    random_state: ${seed}
+    cache_dir: data/adult
+    max_rows: null
+
+sfm:
+  sensitive: [SEX]
+  confounders: [AGE, NATIVE_US]
+  standardize_confounders: [AGE]
+  mediators_disc: [EDUCATION_GRP, OCCUPATION_GRP, HOURS_GRP]
+  mediators_cont: []
+  mediator_layers:
+    - [EDUCATION_GRP]
+    - [OCCUPATION_GRP]
+    - [HOURS_GRP]
+  outcome: income
+
+wc_clip: null
+
+flow:
+  artifact_version: adult_ordered_hours_ppc_v1
+  continuous_family: spline
+  condition_cont_on_disc: true
+  reuse_tensors: true
+  hidden_dim: 64
+  n_layers: 2
+  disc_autoregressive: true
+  disc_embed_dim: 4
+  embed_dim: 4
+  hidden_features: 64
+  n_flow_layers: 4
+  n_blocks: 2
+  num_bins: 8
+  tail_bound: 3.0
+  batch_size: 256
+  max_epochs: 100
+  lr: 0.001
+  patience: 10
+  checkpoint_selection:
+    posterior_predictive: true
+    samples_per_context: 8
+    max_rows: 4096
+    min_group_rows: 200
+    ordered_mediators: [HOURS_GRP]
+    max_overall_marginal_tv: 0.075
+    max_group_marginal_tv: 0.10
+    max_ordered_wasserstein: 0.08
+    score_weight: 2.0
+
+outcome:
+  # [X | Z | Wd] =
+  # [SEX | AGE,NATIVE_US | EDUCATION_GRP,OCCUPATION_GRP,HOURS_GRP]
+  col_types:
+    X: [passthrough]
+    Z: [scale, passthrough]
+    Wd: [ohe, ohe, ohe]
+    Wc: []
+  models:
+    - name: "Logistic Reg."
+      type: logreg
+      C: 1.0
+      max_iter: 1000
+    - name: "MLP (64--32)"
+      type: mlp
+      hidden_layer_sizes: [64, 32]
+      max_iter: 500
+    # Same hyperparameters as the Bar Passage random forest.
+    - name: "Random Forest"
+      type: random_forest
+      n_estimators: 300
+      min_samples_leaf: 20
+      max_features: sqrt
+      n_jobs: -1
+
+gap:
+  K: 500
+  n_inst: 500
+  n_boot: 2000
+
+recourse:
+  propagate_descendants: true
+  intervention_K: 32
+  same_level_semantics: preserve_factual
+  threshold: 0.5
+  nu: 0.05
+  eta: 10.0
+  lambda_invariance: 0.0
+  rho_anchor: 0.0
+  disadvantaged_value: 0
+  advantaged_value: 1
+  reference_K: 200
+  eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
+  rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+  constrained_recourse:
+    enabled: true
+    # Matched to bar and german_synth so all share one evaluation regime.
+    min_success_probability: 0.5
+    max_outcome_wasserstein: 0.1
+  n_max: 0
+  n_boot: 1000
+  sweep_n_max: 250
+  mediators:
+    EDUCATION_GRP:
+      display: "$\\Delta\\mathrm{Edu}$"
+      type: discrete
+      actionable: monotone_up
+    OCCUPATION_GRP:
+      display: "Occ.\\ change"
+      type: discrete
+      actionable: free
+    HOURS_GRP:
+      display: "$\\Delta\\mathrm{HoursBin}$"
+      type: discrete
+      actionable: monotone_up
+
+paths:
+  tensors: outputs/data/adult_tensors.pt
+  flows: outputs/flows/adult/flow_models.pt
+  outcome_dir: outputs/outcome/adult
+  gaps_dir: outputs/gaps
+  recourse_dir: outputs/recourse
+  figures_dir: figures/adult_income

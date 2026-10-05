@@ -1,0 +1,175 @@
+name: oulad
+
+loader:
+  module: data.oulad
+  fn: load_oulad
+  kwargs:
+    random_state: ${seed}
+    cache_dir: data/oulad
+    cutoff_day: 60
+    max_rows: null
+
+split:
+  test_size: 0.2
+  stratify: true
+
+sfm:
+  sensitive: [NO_DECLARED_DISABILITY]
+  confounders: [AGE_MIDPOINT, IMD_MIDPOINT, NUM_PREV_ATTEMPTS,
+                STUDIED_CREDITS, IMD_MISSING, GENDER_MALE, TERM_J, YEAR_2014,
+                EDU_0, EDU_1, EDU_2, EDU_3, EDU_4,
+                MODULE_AAA, MODULE_BBB, MODULE_CCC, MODULE_DDD, MODULE_EEE,
+                MODULE_FFF, MODULE_GGG,
+                REGION_0, REGION_1, REGION_2, REGION_3, REGION_4, REGION_5,
+                REGION_6, REGION_7, REGION_8, REGION_9, REGION_10, REGION_11,
+                REGION_12]
+  standardize_confounders: [AGE_MIDPOINT, IMD_MIDPOINT, NUM_PREV_ATTEMPTS,
+                            STUDIED_CREDITS]
+  mediators_disc: []
+  mediators_cont: [LOG_CLICKS_60, ACTIVE_DAYS_60, RESOURCES_60]
+  mediator_layers:
+    # Same-period summaries are jointly modeled; their order adds no causal edge.
+    - [LOG_CLICKS_60, ACTIVE_DAYS_60, RESOURCES_60]
+  outcome: SUCCESS
+  target_population: registered_and_vle_active_at_day_60
+
+wc_clip: null
+
+flow:
+  artifact_version: oulad_disability_day60_engagement_v1
+  continuous_family: spline
+  condition_cont_on_disc: true
+  condition_cont_on_sensitive: true
+  reuse_tensors: true
+  hidden_dim: 64
+  n_layers: 2
+  disc_autoregressive: true
+  disc_embed_dim: 4
+  embed_dim: 4
+  hidden_features: 64
+  n_flow_layers: 4
+  n_blocks: 2
+  num_bins: 8
+  tail_bound: 3.0
+  batch_size: 512
+  max_epochs: 80
+  lr: 0.001
+  patience: 10
+  checkpoint_selection:
+    posterior_predictive: true
+    samples_per_context: 8
+    max_rows: 4096
+    min_group_rows: 200
+    ordered_mediators: []
+    max_overall_continuous_w1: 0.15
+    max_group_continuous_w1: 0.35
+    max_continuous_correlation_error: 0.15
+    score_weight: 1.0
+
+outcome:
+  # [A | 33 baseline Z variables | 3 continuous engagement mediators]
+  col_types:
+    X: [passthrough]
+    Z:
+      - scale        # AGE_MIDPOINT
+      - scale        # IMD_MIDPOINT
+      - scale        # NUM_PREV_ATTEMPTS
+      - scale        # STUDIED_CREDITS
+      - passthrough  # IMD_MISSING
+      - passthrough  # GENDER_MALE
+      - passthrough  # TERM_J
+      - passthrough  # YEAR_2014
+      - passthrough  # EDU_0
+      - passthrough  # EDU_1
+      - passthrough  # EDU_2
+      - passthrough  # EDU_3
+      - passthrough  # EDU_4
+      - passthrough  # MODULE_AAA
+      - passthrough  # MODULE_BBB
+      - passthrough  # MODULE_CCC
+      - passthrough  # MODULE_DDD
+      - passthrough  # MODULE_EEE
+      - passthrough  # MODULE_FFF
+      - passthrough  # MODULE_GGG
+      - passthrough  # REGION_0
+      - passthrough  # REGION_1
+      - passthrough  # REGION_2
+      - passthrough  # REGION_3
+      - passthrough  # REGION_4
+      - passthrough  # REGION_5
+      - passthrough  # REGION_6
+      - passthrough  # REGION_7
+      - passthrough  # REGION_8
+      - passthrough  # REGION_9
+      - passthrough  # REGION_10
+      - passthrough  # REGION_11
+      - passthrough  # REGION_12
+    Wd: []
+    Wc: [scale, scale, scale]
+  models:
+    - name: "Logistic Reg."
+      type: logreg
+      C: 1.0
+      max_iter: 1000
+    - name: "MLP (64--32)"
+      type: mlp
+      hidden_layer_sizes: [64, 32]
+      max_iter: 500
+
+gap:
+  output_label: disability
+  K: 500
+  n_inst: 500
+  n_boot: 2000
+
+recourse:
+  propagate_descendants: true
+  intervention_K: 32
+  same_level_semantics: preserve_factual
+  threshold: 0.5
+  nu: 0.05
+  eta: 10.0
+  lambda_invariance: 0.0
+  rho_anchor: 0.0
+  disadvantaged_value: 0
+  advantaged_value: 1
+  reference_K: 200
+  eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
+  rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+  constrained_recourse:
+    enabled: true
+    min_success_probability: 0.8
+    max_outcome_wasserstein: 0.1
+    epsilon_diagnostic_grid: [0.025, 0.05, 0.075, 0.1, 0.15, 0.2,
+                              0.3, 0.4, 0.5]
+  n_max: 0
+  n_boot: 1000
+  sweep_n_max: 250
+  mediators:
+    LOG_CLICKS_60:
+      display: "$\\Delta\\log(1+\\mathrm{clicks})$"
+      type: continuous
+      actionable: monotone_up
+      clip: [0.0, 9.25]
+      step: 0.75
+    ACTIVE_DAYS_60:
+      display: "$\\Delta\\mathrm{ActiveDays}$"
+      type: continuous
+      actionable: monotone_up
+      clip: [1.0, 61.0]
+      step: 10.0
+    RESOURCES_60:
+      display: "Resources accessed"
+      type: continuous
+      actionable: fixed
+      clip: [1.0, null]
+      step: 1.0
+
+paths:
+  tensors: outputs/data/oulad_tensors.pt
+  flows: outputs/flows/oulad/flow_models.pt
+  outcome_dir: outputs/outcome/oulad
+  gaps_dir: outputs/gaps
+  recourse_dir: outputs/recourse
+  figures_dir: figures/oulad

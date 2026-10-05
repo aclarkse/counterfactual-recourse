@@ -6,13 +6,13 @@ SFM role assignment
 Sensitive  X : SEX               (0=Female, 1=Male)
 Confounders Z: AGEP, POBP_US     (age; US-born vs not — pre-treatment, not actionable)
 Mediators disc W_disc: SCHL_GRP, OCCP_GRP
-Mediators cont W_cont: WKHP      (clipped to [1, 60] h/week; QuantileTransform → N(0,1))
+Mediators cont W_cont: WKHP, WKWN (usual hours/week and weeks/year)
 Outcome    Y : PINCP > 50k
 
-WKHP is kept continuous and passed through a QuantileTransformer so the flow
-operates in a smooth N(0,1) space. After sampling, values are inverted back to
-hours, clipped to [1, 60], and rounded to the nearest integer. The [1, 60]
-ceiling removes implausibly long work-weeks from counterfactual recommendations.
+WKHP and WKWN form one unordered joint continuous block. Both are passed
+columnwise through a QuantileTransformer before the conditional multivariate
+flow; generated values are inverted to natural units for predictions and
+recourse. WKHP is clipped to [1, 60] and WKWN to [1, 52].
 
 Excluded from mediators
 -----------------------
@@ -71,8 +71,8 @@ def _bucket_occp(s: pd.Series) -> pd.Series:
 
 
 def load_acs_income(
-    year: int = 2018,
-    states: list = None,   # None = all 50 states + DC (pooled)
+    year: int = 2019,
+    states: list = None,
     survey: str = "person",
     threshold: float = 50_000,
     random_state: int = 42,
@@ -93,7 +93,7 @@ def load_acs_income(
     Returns
     -------
     df : DataFrame with columns:
-         SEX, AGEP, POBP_US, SCHL_GRP, OCCP_GRP, WKHP, income
+         SEX, AGEP, POBP_US, SCHL_GRP, OCCP_GRP, WKHP, WKWN, income
     """
     # ── Download ──────────────────────────────────────────────────────────────
     data_source = ACSDataSource(
@@ -104,7 +104,7 @@ def load_acs_income(
     )
 
     if states is None:
-         states=['CA']
+        states = ["CA", "NY"]
 
     print(f"Downloading ACS {year} data for {len(states)} states...")
     acs_data = data_source.get_data(states=states, download=True)
@@ -112,7 +112,8 @@ def load_acs_income(
     # Select only the columns we need directly from the raw PUMS data,
     # avoiding ACSIncome.df_to_numpy which may fail if the cached file was
     # written with a different folktables version (e.g., missing RELP).
-    _COLS = ["AGEP", "SCHL", "OCCP", "POBP", "WKHP", "SEX", "PINCP", "PWGTP"]
+    _COLS = ["AGEP", "SCHL", "OCCP", "POBP", "WKHP", "WKWN",
+             "SEX", "PINCP", "PWGTP"]
     df = acs_data[[c for c in _COLS if c in acs_data.columns]].copy()
 
     # Apply the same filter as folktables' adult_filter
@@ -120,13 +121,16 @@ def load_acs_income(
         (df["AGEP"] > 16) &
         (df["PINCP"] > 100) &
         (df["WKHP"] > 0) &
+        (df["WKWN"] > 0) &
         (df["PWGTP"] >= 1)
     ]
 
     print(f"Raw rows: {len(df):,}")
 
     # ── Drop missing ──────────────────────────────────────────────────────────
-    df = df.dropna(subset=["WKHP", "SCHL", "OCCP", "AGEP", "SEX", "POBP"])
+    df = df.dropna(subset=[
+        "WKHP", "WKWN", "SCHL", "OCCP", "AGEP", "SEX", "POBP"
+    ])
 
     # ── Encode sensitive attribute ────────────────────────────────────────────
     # SEX: 1=Male → 1,  2=Female → 0
@@ -136,10 +140,11 @@ def load_acs_income(
     # POBP codes 1–56 are US states/territories; >56 are foreign countries
     df["POBP_US"] = (df["POBP"] <= 56).astype(int)
 
-    # ── Mediators: bucketing + WKHP clip ─────────────────────────────────────
+    # ── Mediators: bucketing + labor-supply clips ─────────────────────────────
     df["SCHL_GRP"] = _bucket_schl(df["SCHL"].astype(int))
     df["OCCP_GRP"] = _bucket_occp(df["OCCP"].astype(int))
-    df["WKHP"]     = df["WKHP"].clip(upper=60).astype(float)
+    df["WKHP"] = df["WKHP"].clip(lower=1, upper=60).astype(float)
+    df["WKWN"] = df["WKWN"].clip(lower=1, upper=52).astype(float)
 
     # ── Outcome ───────────────────────────────────────────────────────────────
     df["income"] = (df["PINCP"] > threshold).astype(int)
@@ -152,6 +157,7 @@ def load_acs_income(
         "SCHL_GRP",   # W_disc
         "OCCP_GRP",   # W_disc
         "WKHP",       # W_cont  (clipped to [1, 60])
+        "WKWN",       # W_cont  (clipped to [1, 52])
         "income",     # Y
     ]
     df = df[keep].reset_index(drop=True)
@@ -174,7 +180,7 @@ SFM_CONFIG_ACS = {
     "sensitive":      ["SEX"],
     "confounders":    ["AGEP", "POBP_US"],
     "mediators_disc": ["SCHL_GRP", "OCCP_GRP"],
-    "mediators_cont": ["WKHP"],
+    "mediators_cont": ["WKHP", "WKWN"],
     "outcome":        "income",
 }
 

@@ -1,7 +1,7 @@
 """
 outcome/train_outcome.py — Generic Hydra entry point for outcome model training.
 
-Run: python -m outcome.train_outcome [dataset=acs|bar]
+Run: python -m outcome.train_outcome [dataset=acs|adult|bar|german]
 """
 
 import json

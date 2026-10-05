@@ -1,0 +1,1323 @@
+{
+  "metadata": {
+    "seeds": [
+      42
+    ],
+    "n_seeds": 1,
+    "uncertainty": "sample standard deviation across complete refits",
+    "within_seed_intervals": "individual bootstrap with fitted models held fixed; retained in each seed's ablation JSON",
+    "selection": "both methods minimize cost subject to 80% factual validity with the same abstention rule; the primary method alone adds a recipient-conditional prediction-W1 radius of 0.10"
+  },
+  "seed_level": [
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "Logistic Reg.",
+      "flow_best_val_nll": 2.4280060631781963,
+      "flow_best_epoch": 27,
+      "validation_auc": 0.7553282183787102,
+      "validation_accuracy": 0.7099668422079188,
+      "pure_nde": 0.06084066471457481,
+      "pure_nie": -0.003444500654935837,
+      "total_effect": 0.0577000478208065,
+      "addressability": 0.05969666898081422,
+      "effect_ratio_heuristic": 17.663130540385435,
+      "scenario": "ordinary_actionable_recourse",
+      "recipients": 147,
+      "post_recourse_mediated_prediction_disparity": -0.09225273699544295,
+      "factual_mediated_prediction_disparity_closure": 0.3701720655612786,
+      "recipient_level_closure": 0.15758088572562212,
+      "mean_absolute_gap_reduction": 0.025162884740523098,
+      "overshoot_rate": 0.6190476190476191,
+      "overshoot_magnitude": 0.08962795641814898,
+      "outcome_wasserstein": 0.2071895397305282,
+      "constraint_feasible_rate": 1.0,
+      "constraint_abstention_rate": 0.0,
+      "feasible_rate": 1.0,
+      "cost": 3.986188315412625,
+      "factual_closure_gain_vs_actionable_baseline": 0.0,
+      "paired_absolute_gap_gain_vs_actionable_baseline": 0.0,
+      "cost_difference_vs_actionable_baseline": 0.0,
+      "feasibility_difference_vs_actionable_baseline": 0.0
+    },
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "Logistic Reg.",
+      "flow_best_val_nll": 2.4280060631781963,
+      "flow_best_epoch": 27,
+      "validation_auc": 0.7553282183787102,
+      "validation_accuracy": 0.7099668422079188,
+      "pure_nde": 0.06084066471457481,
+      "pure_nie": -0.003444500654935837,
+      "total_effect": 0.0577000478208065,
+      "addressability": 0.05969666898081422,
+      "effect_ratio_heuristic": 17.663130540385435,
+      "scenario": "mediation_aware_recourse",
+      "recipients": 147,
+      "post_recourse_mediated_prediction_disparity": 0.14194134292854876,
+      "factual_mediated_prediction_disparity_closure": 0.03093798905324452,
+      "recipient_level_closure": 0.02837870225304273,
+      "mean_absolute_gap_reduction": 0.004531577612289236,
+      "overshoot_rate": 0.0,
+      "overshoot_magnitude": 0.0,
+      "outcome_wasserstein": 0.20330224147367523,
+      "constraint_feasible_rate": 0.027210884353741496,
+      "constraint_abstention_rate": 0.9727891156462585,
+      "feasible_rate": 0.12244897959183673,
+      "cost": 0.031732045063356154,
+      "factual_closure_gain_vs_actionable_baseline": -0.33923407650803405,
+      "paired_absolute_gap_gain_vs_actionable_baseline": -0.020631307128233866,
+      "cost_difference_vs_actionable_baseline": -3.954456270349269,
+      "feasibility_difference_vs_actionable_baseline": -0.9727891156462585
+    },
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "MLP (64--32)",
+      "flow_best_val_nll": 2.4280060631781963,
+      "flow_best_epoch": 27,
+      "validation_auc": 0.7569564543206282,
+      "validation_accuracy": 0.7093817047006047,
+      "pure_nde": 0.06927357053756714,
+      "pure_nie": -0.002825086921453476,
+      "total_effect": 0.06684026736021041,
+      "addressability": 0.042266242087703444,
+      "effect_ratio_heuristic": 24.520863415390647,
+      "scenario": "ordinary_actionable_recourse",
+      "recipients": 142,
+      "post_recourse_mediated_prediction_disparity": -0.11607211450455894,
+      "factual_mediated_prediction_disparity_closure": 0.2277602635567798,
+      "recipient_level_closure": 0.13128295466885465,
+      "mean_absolute_gap_reduction": 0.02229193925962482,
+      "overshoot_rate": 0.6197183098591549,
+      "overshoot_magnitude": 0.09529147181712405,
+      "outcome_wasserstein": 0.2126962980664086,
+      "constraint_feasible_rate": 0.9788732394366197,
+      "constraint_abstention_rate": 0.02112676056338028,
+      "feasible_rate": 0.9788732394366197,
+      "cost": 2.9204496447469146,
+      "factual_closure_gain_vs_actionable_baseline": 0.0,
+      "paired_absolute_gap_gain_vs_actionable_baseline": 0.0,
+      "cost_difference_vs_actionable_baseline": 0.0,
+      "feasibility_difference_vs_actionable_baseline": 0.0
+    },
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "MLP (64--32)",
+      "flow_best_val_nll": 2.4280060631781963,
+      "flow_best_epoch": 27,
+      "validation_auc": 0.7569564543206282,
+      "validation_accuracy": 0.7093817047006047,
+      "pure_nde": 0.06927357053756714,
+      "pure_nie": -0.002825086921453476,
+      "total_effect": 0.06684026736021041,
+      "addressability": 0.042266242087703444,
+      "effect_ratio_heuristic": 24.520863415390647,
+      "scenario": "mediation_aware_recourse",
+      "recipients": 142,
+      "post_recourse_mediated_prediction_disparity": 0.14667579660218366,
+      "factual_mediated_prediction_disparity_closure": 0.02415081353393589,
+      "recipient_level_closure": 0.02137804600650095,
+      "mean_absolute_gap_reduction": 0.0036300074466517275,
+      "overshoot_rate": 0.0,
+      "overshoot_magnitude": 0.0,
+      "outcome_wasserstein": 0.21667417092412763,
+      "constraint_feasible_rate": 0.014084507042253521,
+      "constraint_abstention_rate": 0.9859154929577465,
+      "feasible_rate": 0.11971830985915492,
+      "cost": 0.026037622505510356,
+      "factual_closure_gain_vs_actionable_baseline": -0.20360945002284392,
+      "paired_absolute_gap_gain_vs_actionable_baseline": -0.01866193181297309,
+      "cost_difference_vs_actionable_baseline": -2.8944120222414043,
+      "feasibility_difference_vs_actionable_baseline": -0.9647887323943662
+    }
+  ],
+  "aggregate": [
+    {
+      "dataset": "oulad",
+      "model": "Logistic Reg.",
+      "scenario": "ordinary_actionable_recourse",
+      "metrics": {
+        "flow_best_val_nll": {
+          "mean": 2.4280060631781963,
+          "sd": 0.0,
+          "min": 2.4280060631781963,
+          "max": 2.4280060631781963,
+          "n_seeds": 1
+        },
+        "flow_best_epoch": {
+          "mean": 27.0,
+          "sd": 0.0,
+          "min": 27.0,
+          "max": 27.0,
+          "n_seeds": 1
+        },
+        "validation_auc": {
+          "mean": 0.7553282183787102,
+          "sd": 0.0,
+          "min": 0.7553282183787102,
+          "max": 0.7553282183787102,
+          "n_seeds": 1
+        },
+        "validation_accuracy": {
+          "mean": 0.7099668422079188,
+          "sd": 0.0,
+          "min": 0.7099668422079188,
+          "max": 0.7099668422079188,
+          "n_seeds": 1
+        },
+        "pure_nde": {
+          "mean": 0.06084066471457481,
+          "sd": 0.0,
+          "min": 0.06084066471457481,
+          "max": 0.06084066471457481,
+          "n_seeds": 1
+        },
+        "pure_nie": {
+          "mean": -0.003444500654935837,
+          "sd": 0.0,
+          "min": -0.003444500654935837,
+          "max": -0.003444500654935837,
+          "n_seeds": 1
+        },
+        "total_effect": {
+          "mean": 0.0577000478208065,
+          "sd": 0.0,
+          "min": 0.0577000478208065,
+          "max": 0.0577000478208065,
+          "n_seeds": 1
+        },
+        "addressability": {
+          "mean": 0.05969666898081422,
+          "sd": 0.0,
+          "min": 0.05969666898081422,
+          "max": 0.05969666898081422,
+          "n_seeds": 1
+        },
+        "effect_ratio_heuristic": {
+          "mean": 17.663130540385435,
+          "sd": 0.0,
+          "min": 17.663130540385435,
+          "max": 17.663130540385435,
+          "n_seeds": 1
+        },
+        "recipients": {
+          "mean": 147.0,
+          "sd": 0.0,
+          "min": 147.0,
+          "max": 147.0,
+          "n_seeds": 1
+        },
+        "post_recourse_mediated_prediction_disparity": {
+          "mean": -0.09225273699544295,
+          "sd": 0.0,
+          "min": -0.09225273699544295,
+          "max": -0.09225273699544295,
+          "n_seeds": 1
+        },
+        "factual_mediated_prediction_disparity_closure": {
+          "mean": 0.3701720655612786,
+          "sd": 0.0,
+          "min": 0.3701720655612786,
+          "max": 0.3701720655612786,
+          "n_seeds": 1
+        },
+        "recipient_level_closure": {
+          "mean": 0.15758088572562212,
+          "sd": 0.0,
+          "min": 0.15758088572562212,
+          "max": 0.15758088572562212,
+          "n_seeds": 1
+        },
+        "mean_absolute_gap_reduction": {
+          "mean": 0.025162884740523098,
+          "sd": 0.0,
+          "min": 0.025162884740523098,
+          "max": 0.025162884740523098,
+          "n_seeds": 1
+        },
+        "overshoot_rate": {
+          "mean": 0.6190476190476191,
+          "sd": 0.0,
+          "min": 0.6190476190476191,
+          "max": 0.6190476190476191,
+          "n_seeds": 1
+        },
+        "overshoot_magnitude": {
+          "mean": 0.08962795641814898,
+          "sd": 0.0,
+          "min": 0.08962795641814898,
+          "max": 0.08962795641814898,
+          "n_seeds": 1
+        },
+        "outcome_wasserstein": {
+          "mean": 0.2071895397305282,
+          "sd": 0.0,
+          "min": 0.2071895397305282,
+          "max": 0.2071895397305282,
+          "n_seeds": 1
+        },
+        "constraint_feasible_rate": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n_seeds": 1
+        },
+        "constraint_abstention_rate": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "feasible_rate": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n_seeds": 1
+        },
+        "cost": {
+          "mean": 3.986188315412625,
+          "sd": 0.0,
+          "min": 3.986188315412625,
+          "max": 3.986188315412625,
+          "n_seeds": 1
+        },
+        "factual_closure_gain_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "paired_absolute_gap_gain_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "cost_difference_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "feasibility_difference_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        }
+      }
+    },
+    {
+      "dataset": "oulad",
+      "model": "Logistic Reg.",
+      "scenario": "mediation_aware_recourse",
+      "metrics": {
+        "flow_best_val_nll": {
+          "mean": 2.4280060631781963,
+          "sd": 0.0,
+          "min": 2.4280060631781963,
+          "max": 2.4280060631781963,
+          "n_seeds": 1
+        },
+        "flow_best_epoch": {
+          "mean": 27.0,
+          "sd": 0.0,
+          "min": 27.0,
+          "max": 27.0,
+          "n_seeds": 1
+        },
+        "validation_auc": {
+          "mean": 0.7553282183787102,
+          "sd": 0.0,
+          "min": 0.7553282183787102,
+          "max": 0.7553282183787102,
+          "n_seeds": 1
+        },
+        "validation_accuracy": {
+          "mean": 0.7099668422079188,
+          "sd": 0.0,
+          "min": 0.7099668422079188,
+          "max": 0.7099668422079188,
+          "n_seeds": 1
+        },
+        "pure_nde": {
+          "mean": 0.06084066471457481,
+          "sd": 0.0,
+          "min": 0.06084066471457481,
+          "max": 0.06084066471457481,
+          "n_seeds": 1
+        },
+        "pure_nie": {
+          "mean": -0.003444500654935837,
+          "sd": 0.0,
+          "min": -0.003444500654935837,
+          "max": -0.003444500654935837,
+          "n_seeds": 1
+        },
+        "total_effect": {
+          "mean": 0.0577000478208065,
+          "sd": 0.0,
+          "min": 0.0577000478208065,
+          "max": 0.0577000478208065,
+          "n_seeds": 1
+        },
+        "addressability": {
+          "mean": 0.05969666898081422,
+          "sd": 0.0,
+          "min": 0.05969666898081422,
+          "max": 0.05969666898081422,
+          "n_seeds": 1
+        },
+        "effect_ratio_heuristic": {
+          "mean": 17.663130540385435,
+          "sd": 0.0,
+          "min": 17.663130540385435,
+          "max": 17.663130540385435,
+          "n_seeds": 1
+        },
+        "recipients": {
+          "mean": 147.0,
+          "sd": 0.0,
+          "min": 147.0,
+          "max": 147.0,
+          "n_seeds": 1
+        },
+        "post_recourse_mediated_prediction_disparity": {
+          "mean": 0.14194134292854876,
+          "sd": 0.0,
+          "min": 0.14194134292854876,
+          "max": 0.14194134292854876,
+          "n_seeds": 1
+        },
+        "factual_mediated_prediction_disparity_closure": {
+          "mean": 0.03093798905324452,
+          "sd": 0.0,
+          "min": 0.03093798905324452,
+          "max": 0.03093798905324452,
+          "n_seeds": 1
+        },
+        "recipient_level_closure": {
+          "mean": 0.02837870225304273,
+          "sd": 0.0,
+          "min": 0.02837870225304273,
+          "max": 0.02837870225304273,
+          "n_seeds": 1
+        },
+        "mean_absolute_gap_reduction": {
+          "mean": 0.004531577612289236,
+          "sd": 0.0,
+          "min": 0.004531577612289236,
+          "max": 0.004531577612289236,
+          "n_seeds": 1
+        },
+        "overshoot_rate": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "overshoot_magnitude": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "outcome_wasserstein": {
+          "mean": 0.20330224147367523,
+          "sd": 0.0,
+          "min": 0.20330224147367523,
+          "max": 0.20330224147367523,
+          "n_seeds": 1
+        },
+        "constraint_feasible_rate": {
+          "mean": 0.027210884353741496,
+          "sd": 0.0,
+          "min": 0.027210884353741496,
+          "max": 0.027210884353741496,
+          "n_seeds": 1
+        },
+        "constraint_abstention_rate": {
+          "mean": 0.9727891156462585,
+          "sd": 0.0,
+          "min": 0.9727891156462585,
+          "max": 0.9727891156462585,
+          "n_seeds": 1
+        },
+        "feasible_rate": {
+          "mean": 0.12244897959183673,
+          "sd": 0.0,
+          "min": 0.12244897959183673,
+          "max": 0.12244897959183673,
+          "n_seeds": 1
+        },
+        "cost": {
+          "mean": 0.031732045063356154,
+          "sd": 0.0,
+          "min": 0.031732045063356154,
+          "max": 0.031732045063356154,
+          "n_seeds": 1
+        },
+        "factual_closure_gain_vs_actionable_baseline": {
+          "mean": -0.33923407650803405,
+          "sd": 0.0,
+          "min": -0.33923407650803405,
+          "max": -0.33923407650803405,
+          "n_seeds": 1
+        },
+        "paired_absolute_gap_gain_vs_actionable_baseline": {
+          "mean": -0.020631307128233866,
+          "sd": 0.0,
+          "min": -0.020631307128233866,
+          "max": -0.020631307128233866,
+          "n_seeds": 1
+        },
+        "cost_difference_vs_actionable_baseline": {
+          "mean": -3.954456270349269,
+          "sd": 0.0,
+          "min": -3.954456270349269,
+          "max": -3.954456270349269,
+          "n_seeds": 1
+        },
+        "feasibility_difference_vs_actionable_baseline": {
+          "mean": -0.9727891156462585,
+          "sd": 0.0,
+          "min": -0.9727891156462585,
+          "max": -0.9727891156462585,
+          "n_seeds": 1
+        }
+      }
+    },
+    {
+      "dataset": "oulad",
+      "model": "MLP (64--32)",
+      "scenario": "ordinary_actionable_recourse",
+      "metrics": {
+        "flow_best_val_nll": {
+          "mean": 2.4280060631781963,
+          "sd": 0.0,
+          "min": 2.4280060631781963,
+          "max": 2.4280060631781963,
+          "n_seeds": 1
+        },
+        "flow_best_epoch": {
+          "mean": 27.0,
+          "sd": 0.0,
+          "min": 27.0,
+          "max": 27.0,
+          "n_seeds": 1
+        },
+        "validation_auc": {
+          "mean": 0.7569564543206282,
+          "sd": 0.0,
+          "min": 0.7569564543206282,
+          "max": 0.7569564543206282,
+          "n_seeds": 1
+        },
+        "validation_accuracy": {
+          "mean": 0.7093817047006047,
+          "sd": 0.0,
+          "min": 0.7093817047006047,
+          "max": 0.7093817047006047,
+          "n_seeds": 1
+        },
+        "pure_nde": {
+          "mean": 0.06927357053756714,
+          "sd": 0.0,
+          "min": 0.06927357053756714,
+          "max": 0.06927357053756714,
+          "n_seeds": 1
+        },
+        "pure_nie": {
+          "mean": -0.002825086921453476,
+          "sd": 0.0,
+          "min": -0.002825086921453476,
+          "max": -0.002825086921453476,
+          "n_seeds": 1
+        },
+        "total_effect": {
+          "mean": 0.06684026736021041,
+          "sd": 0.0,
+          "min": 0.06684026736021041,
+          "max": 0.06684026736021041,
+          "n_seeds": 1
+        },
+        "addressability": {
+          "mean": 0.042266242087703444,
+          "sd": 0.0,
+          "min": 0.042266242087703444,
+          "max": 0.042266242087703444,
+          "n_seeds": 1
+        },
+        "effect_ratio_heuristic": {
+          "mean": 24.520863415390647,
+          "sd": 0.0,
+          "min": 24.520863415390647,
+          "max": 24.520863415390647,
+          "n_seeds": 1
+        },
+        "recipients": {
+          "mean": 142.0,
+          "sd": 0.0,
+          "min": 142.0,
+          "max": 142.0,
+          "n_seeds": 1
+        },
+        "post_recourse_mediated_prediction_disparity": {
+          "mean": -0.11607211450455894,
+          "sd": 0.0,
+          "min": -0.11607211450455894,
+          "max": -0.11607211450455894,
+          "n_seeds": 1
+        },
+        "factual_mediated_prediction_disparity_closure": {
+          "mean": 0.2277602635567798,
+          "sd": 0.0,
+          "min": 0.2277602635567798,
+          "max": 0.2277602635567798,
+          "n_seeds": 1
+        },
+        "recipient_level_closure": {
+          "mean": 0.13128295466885465,
+          "sd": 0.0,
+          "min": 0.13128295466885465,
+          "max": 0.13128295466885465,
+          "n_seeds": 1
+        },
+        "mean_absolute_gap_reduction": {
+          "mean": 0.02229193925962482,
+          "sd": 0.0,
+          "min": 0.02229193925962482,
+          "max": 0.02229193925962482,
+          "n_seeds": 1
+        },
+        "overshoot_rate": {
+          "mean": 0.6197183098591549,
+          "sd": 0.0,
+          "min": 0.6197183098591549,
+          "max": 0.6197183098591549,
+          "n_seeds": 1
+        },
+        "overshoot_magnitude": {
+          "mean": 0.09529147181712405,
+          "sd": 0.0,
+          "min": 0.09529147181712405,
+          "max": 0.09529147181712405,
+          "n_seeds": 1
+        },
+        "outcome_wasserstein": {
+          "mean": 0.2126962980664086,
+          "sd": 0.0,
+          "min": 0.2126962980664086,
+          "max": 0.2126962980664086,
+          "n_seeds": 1
+        },
+        "constraint_feasible_rate": {
+          "mean": 0.9788732394366197,
+          "sd": 0.0,
+          "min": 0.9788732394366197,
+          "max": 0.9788732394366197,
+          "n_seeds": 1
+        },
+        "constraint_abstention_rate": {
+          "mean": 0.02112676056338028,
+          "sd": 0.0,
+          "min": 0.02112676056338028,
+          "max": 0.02112676056338028,
+          "n_seeds": 1
+        },
+        "feasible_rate": {
+          "mean": 0.9788732394366197,
+          "sd": 0.0,
+          "min": 0.9788732394366197,
+          "max": 0.9788732394366197,
+          "n_seeds": 1
+        },
+        "cost": {
+          "mean": 2.9204496447469146,
+          "sd": 0.0,
+          "min": 2.9204496447469146,
+          "max": 2.9204496447469146,
+          "n_seeds": 1
+        },
+        "factual_closure_gain_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "paired_absolute_gap_gain_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "cost_difference_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "feasibility_difference_vs_actionable_baseline": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        }
+      }
+    },
+    {
+      "dataset": "oulad",
+      "model": "MLP (64--32)",
+      "scenario": "mediation_aware_recourse",
+      "metrics": {
+        "flow_best_val_nll": {
+          "mean": 2.4280060631781963,
+          "sd": 0.0,
+          "min": 2.4280060631781963,
+          "max": 2.4280060631781963,
+          "n_seeds": 1
+        },
+        "flow_best_epoch": {
+          "mean": 27.0,
+          "sd": 0.0,
+          "min": 27.0,
+          "max": 27.0,
+          "n_seeds": 1
+        },
+        "validation_auc": {
+          "mean": 0.7569564543206282,
+          "sd": 0.0,
+          "min": 0.7569564543206282,
+          "max": 0.7569564543206282,
+          "n_seeds": 1
+        },
+        "validation_accuracy": {
+          "mean": 0.7093817047006047,
+          "sd": 0.0,
+          "min": 0.7093817047006047,
+          "max": 0.7093817047006047,
+          "n_seeds": 1
+        },
+        "pure_nde": {
+          "mean": 0.06927357053756714,
+          "sd": 0.0,
+          "min": 0.06927357053756714,
+          "max": 0.06927357053756714,
+          "n_seeds": 1
+        },
+        "pure_nie": {
+          "mean": -0.002825086921453476,
+          "sd": 0.0,
+          "min": -0.002825086921453476,
+          "max": -0.002825086921453476,
+          "n_seeds": 1
+        },
+        "total_effect": {
+          "mean": 0.06684026736021041,
+          "sd": 0.0,
+          "min": 0.06684026736021041,
+          "max": 0.06684026736021041,
+          "n_seeds": 1
+        },
+        "addressability": {
+          "mean": 0.042266242087703444,
+          "sd": 0.0,
+          "min": 0.042266242087703444,
+          "max": 0.042266242087703444,
+          "n_seeds": 1
+        },
+        "effect_ratio_heuristic": {
+          "mean": 24.520863415390647,
+          "sd": 0.0,
+          "min": 24.520863415390647,
+          "max": 24.520863415390647,
+          "n_seeds": 1
+        },
+        "recipients": {
+          "mean": 142.0,
+          "sd": 0.0,
+          "min": 142.0,
+          "max": 142.0,
+          "n_seeds": 1
+        },
+        "post_recourse_mediated_prediction_disparity": {
+          "mean": 0.14667579660218366,
+          "sd": 0.0,
+          "min": 0.14667579660218366,
+          "max": 0.14667579660218366,
+          "n_seeds": 1
+        },
+        "factual_mediated_prediction_disparity_closure": {
+          "mean": 0.02415081353393589,
+          "sd": 0.0,
+          "min": 0.02415081353393589,
+          "max": 0.02415081353393589,
+          "n_seeds": 1
+        },
+        "recipient_level_closure": {
+          "mean": 0.02137804600650095,
+          "sd": 0.0,
+          "min": 0.02137804600650095,
+          "max": 0.02137804600650095,
+          "n_seeds": 1
+        },
+        "mean_absolute_gap_reduction": {
+          "mean": 0.0036300074466517275,
+          "sd": 0.0,
+          "min": 0.0036300074466517275,
+          "max": 0.0036300074466517275,
+          "n_seeds": 1
+        },
+        "overshoot_rate": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "overshoot_magnitude": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n_seeds": 1
+        },
+        "outcome_wasserstein": {
+          "mean": 0.21667417092412763,
+          "sd": 0.0,
+          "min": 0.21667417092412763,
+          "max": 0.21667417092412763,
+          "n_seeds": 1
+        },
+        "constraint_feasible_rate": {
+          "mean": 0.014084507042253521,
+          "sd": 0.0,
+          "min": 0.014084507042253521,
+          "max": 0.014084507042253521,
+          "n_seeds": 1
+        },
+        "constraint_abstention_rate": {
+          "mean": 0.9859154929577465,
+          "sd": 0.0,
+          "min": 0.9859154929577465,
+          "max": 0.9859154929577465,
+          "n_seeds": 1
+        },
+        "feasible_rate": {
+          "mean": 0.11971830985915492,
+          "sd": 0.0,
+          "min": 0.11971830985915492,
+          "max": 0.11971830985915492,
+          "n_seeds": 1
+        },
+        "cost": {
+          "mean": 0.026037622505510356,
+          "sd": 0.0,
+          "min": 0.026037622505510356,
+          "max": 0.026037622505510356,
+          "n_seeds": 1
+        },
+        "factual_closure_gain_vs_actionable_baseline": {
+          "mean": -0.20360945002284392,
+          "sd": 0.0,
+          "min": -0.20360945002284392,
+          "max": -0.20360945002284392,
+          "n_seeds": 1
+        },
+        "paired_absolute_gap_gain_vs_actionable_baseline": {
+          "mean": -0.01866193181297309,
+          "sd": 0.0,
+          "min": -0.01866193181297309,
+          "max": -0.01866193181297309,
+          "n_seeds": 1
+        },
+        "cost_difference_vs_actionable_baseline": {
+          "mean": -2.8944120222414043,
+          "sd": 0.0,
+          "min": -2.8944120222414043,
+          "max": -2.8944120222414043,
+          "n_seeds": 1
+        },
+        "feasibility_difference_vs_actionable_baseline": {
+          "mean": -0.9647887323943662,
+          "sd": 0.0,
+          "min": -0.9647887323943662,
+          "max": -0.9647887323943662,
+          "n_seeds": 1
+        }
+      }
+    }
+  ],
+  "diagnostic_seed_level": [
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "Logistic Reg.",
+      "reference_validity_rate": 0.08163265306122448,
+      "reference_success_probability_mean": 0.3908503401360544,
+      "validity_only_coverage": 1.0,
+      "minimum_attainable_w1_mean": 0.19606402807796072,
+      "minimum_attainable_w1_median": 0.1858442732763809,
+      "coverage_vs_epsilon": [
+        {
+          "epsilon": 0.025,
+          "coverage": 0.0,
+          "n_feasible": 0,
+          "coverage_reference_valid": 0.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.05,
+          "coverage": 0.0,
+          "n_feasible": 0,
+          "coverage_reference_valid": 0.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.075,
+          "coverage": 0.0,
+          "n_feasible": 0,
+          "coverage_reference_valid": 0.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.1,
+          "coverage": 0.027210884353741496,
+          "n_feasible": 4,
+          "coverage_reference_valid": 0.25,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.007407407407407408,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.15,
+          "coverage": 0.21768707482993196,
+          "n_feasible": 32,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.14814814814814814,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.2,
+          "coverage": 0.5918367346938775,
+          "n_feasible": 87,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.5555555555555556,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.3,
+          "coverage": 0.9251700680272109,
+          "n_feasible": 136,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.9185185185185185,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.4,
+          "coverage": 0.9931972789115646,
+          "n_feasible": 146,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 0.9925925925925926,
+          "n_reference_invalid": 135
+        },
+        {
+          "epsilon": 0.5,
+          "coverage": 1.0,
+          "n_feasible": 147,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 12,
+          "coverage_reference_invalid": 1.0,
+          "n_reference_invalid": 135
+        }
+      ]
+    },
+    {
+      "dataset": "oulad",
+      "seed": 42,
+      "model": "MLP (64--32)",
+      "reference_validity_rate": 0.06338028169014084,
+      "reference_success_probability_mean": 0.3854225352112676,
+      "validity_only_coverage": 0.9788732394366197,
+      "minimum_attainable_w1_mean": 0.19435112602760843,
+      "minimum_attainable_w1_median": 0.1914006995037198,
+      "coverage_vs_epsilon": [
+        {
+          "epsilon": 0.025,
+          "coverage": 0.0,
+          "n_feasible": 0,
+          "coverage_reference_valid": 0.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.05,
+          "coverage": 0.0,
+          "n_feasible": 0,
+          "coverage_reference_valid": 0.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.075,
+          "coverage": 0.007042253521126761,
+          "n_feasible": 1,
+          "coverage_reference_valid": 0.1111111111111111,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.1,
+          "coverage": 0.014084507042253521,
+          "n_feasible": 2,
+          "coverage_reference_valid": 0.2222222222222222,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.0,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.15,
+          "coverage": 0.176056338028169,
+          "n_feasible": 25,
+          "coverage_reference_valid": 0.8888888888888888,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.12781954887218044,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.2,
+          "coverage": 0.5492957746478874,
+          "n_feasible": 78,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.518796992481203,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.3,
+          "coverage": 0.9577464788732394,
+          "n_feasible": 136,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.9548872180451128,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.4,
+          "coverage": 0.9788732394366197,
+          "n_feasible": 139,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.9774436090225563,
+          "n_reference_invalid": 133
+        },
+        {
+          "epsilon": 0.5,
+          "coverage": 0.9788732394366197,
+          "n_feasible": 139,
+          "coverage_reference_valid": 1.0,
+          "n_reference_valid": 9,
+          "coverage_reference_invalid": 0.9774436090225563,
+          "n_reference_invalid": 133
+        }
+      ]
+    }
+  ],
+  "diagnostic_aggregate": [
+    {
+      "dataset": "oulad",
+      "model": "Logistic Reg.",
+      "metrics": {
+        "reference_validity_rate": {
+          "mean": 0.08163265306122448,
+          "sd": 0.0,
+          "min": 0.08163265306122448,
+          "max": 0.08163265306122448,
+          "n_seeds": 1
+        },
+        "reference_success_probability_mean": {
+          "mean": 0.3908503401360544,
+          "sd": 0.0,
+          "min": 0.3908503401360544,
+          "max": 0.3908503401360544,
+          "n_seeds": 1
+        },
+        "validity_only_coverage": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n_seeds": 1
+        },
+        "minimum_attainable_w1_mean": {
+          "mean": 0.19606402807796072,
+          "sd": 0.0,
+          "min": 0.19606402807796072,
+          "max": 0.19606402807796072,
+          "n_seeds": 1
+        },
+        "minimum_attainable_w1_median": {
+          "mean": 0.1858442732763809,
+          "sd": 0.0,
+          "min": 0.1858442732763809,
+          "max": 0.1858442732763809,
+          "n_seeds": 1
+        }
+      },
+      "coverage_vs_epsilon": [
+        {
+          "epsilon": 0.025,
+          "coverage": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.05,
+          "coverage": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.075,
+          "coverage": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.1,
+          "coverage": {
+            "mean": 0.027210884353741496,
+            "sd": 0.0,
+            "min": 0.027210884353741496,
+            "max": 0.027210884353741496,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.15,
+          "coverage": {
+            "mean": 0.21768707482993196,
+            "sd": 0.0,
+            "min": 0.21768707482993196,
+            "max": 0.21768707482993196,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.2,
+          "coverage": {
+            "mean": 0.5918367346938775,
+            "sd": 0.0,
+            "min": 0.5918367346938775,
+            "max": 0.5918367346938775,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.3,
+          "coverage": {
+            "mean": 0.9251700680272109,
+            "sd": 0.0,
+            "min": 0.9251700680272109,
+            "max": 0.9251700680272109,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.4,
+          "coverage": {
+            "mean": 0.9931972789115646,
+            "sd": 0.0,
+            "min": 0.9931972789115646,
+            "max": 0.9931972789115646,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.5,
+          "coverage": {
+            "mean": 1.0,
+            "sd": 0.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n_seeds": 1
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "oulad",
+      "model": "MLP (64--32)",
+      "metrics": {
+        "reference_validity_rate": {
+          "mean": 0.06338028169014084,
+          "sd": 0.0,
+          "min": 0.06338028169014084,
+          "max": 0.06338028169014084,
+          "n_seeds": 1
+        },
+        "reference_success_probability_mean": {
+          "mean": 0.3854225352112676,
+          "sd": 0.0,
+          "min": 0.3854225352112676,
+          "max": 0.3854225352112676,
+          "n_seeds": 1
+        },
+        "validity_only_coverage": {
+          "mean": 0.9788732394366197,
+          "sd": 0.0,
+          "min": 0.9788732394366197,
+          "max": 0.9788732394366197,
+          "n_seeds": 1
+        },
+        "minimum_attainable_w1_mean": {
+          "mean": 0.19435112602760843,
+          "sd": 0.0,
+          "min": 0.19435112602760843,
+          "max": 0.19435112602760843,
+          "n_seeds": 1
+        },
+        "minimum_attainable_w1_median": {
+          "mean": 0.1914006995037198,
+          "sd": 0.0,
+          "min": 0.1914006995037198,
+          "max": 0.1914006995037198,
+          "n_seeds": 1
+        }
+      },
+      "coverage_vs_epsilon": [
+        {
+          "epsilon": 0.025,
+          "coverage": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.05,
+          "coverage": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.075,
+          "coverage": {
+            "mean": 0.007042253521126761,
+            "sd": 0.0,
+            "min": 0.007042253521126761,
+            "max": 0.007042253521126761,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.1,
+          "coverage": {
+            "mean": 0.014084507042253521,
+            "sd": 0.0,
+            "min": 0.014084507042253521,
+            "max": 0.014084507042253521,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.15,
+          "coverage": {
+            "mean": 0.176056338028169,
+            "sd": 0.0,
+            "min": 0.176056338028169,
+            "max": 0.176056338028169,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.2,
+          "coverage": {
+            "mean": 0.5492957746478874,
+            "sd": 0.0,
+            "min": 0.5492957746478874,
+            "max": 0.5492957746478874,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.3,
+          "coverage": {
+            "mean": 0.9577464788732394,
+            "sd": 0.0,
+            "min": 0.9577464788732394,
+            "max": 0.9577464788732394,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.4,
+          "coverage": {
+            "mean": 0.9788732394366197,
+            "sd": 0.0,
+            "min": 0.9788732394366197,
+            "max": 0.9788732394366197,
+            "n_seeds": 1
+          }
+        },
+        {
+          "epsilon": 0.5,
+          "coverage": {
+            "mean": 0.9788732394366197,
+            "sd": 0.0,
+            "min": 0.9788732394366197,
+            "max": 0.9788732394366197,
+            "n_seeds": 1
+          }
+        }
+      ]
+    }
+  ]
+}

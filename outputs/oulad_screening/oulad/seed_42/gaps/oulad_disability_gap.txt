@@ -1,0 +1,17 @@
+Logistic Reg. (n=500)
+  observed prediction gap: +0.0921
+  pure NDE: +0.0608 [+0.0602, +0.0614]
+  pure NIE: -0.0034 [-0.0049, -0.0021]
+  total effect (direct): +0.0577 [+0.0562, +0.0592]
+  X-W interaction residual: +0.0003
+  addressability |NIE/TE|: 0.060
+  effect-ratio heuristic |NDE/NIE|: 17.663
+
+MLP (64--32) (n=500)
+  observed prediction gap: +0.0992
+  pure NDE: +0.0693 [+0.0672, +0.0713]
+  pure NIE: -0.0028 [-0.0042, -0.0014]
+  total effect (direct): +0.0668 [+0.0644, +0.0694]
+  X-W interaction residual: +0.0004
+  addressability |NIE/TE|: 0.042
+  effect-ratio heuristic |NDE/NIE|: 24.521

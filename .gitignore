@@ -1,5 +1,8 @@
-# Raw ACS / law-school data files (large, not versioned)
+# Raw dataset files (large, not versioned)
 data/acs/
+data/adult/
+data/german/
+data/oulad/
 data/atherosclerosis.*
 data/*.csv
 data/*.xls
@@ -32,3 +35,6 @@ outputs/**/*.joblib
 dist/
 build/
 .env
+
+# Referee reviews (confidential)
+Referee Review*.pdf

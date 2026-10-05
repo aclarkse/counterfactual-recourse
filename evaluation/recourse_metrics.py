@@ -40,7 +40,7 @@ def estimate_reference_terms(pipe, scaler, Z, sample_fn, K=200,
     """
     outcome = make_outcome_fn(pipe, scaler)
     ref_adv, natural_dis = [], []
-    wd_reference, wc_reference = [], []
+    wd_reference, wc_reference, prediction_reference = [], [], []
     for start in range(0, len(Z), batch_size):
         z = Z[start:start + batch_size]
         b = len(z)
@@ -50,12 +50,16 @@ def estimate_reference_terms(pipe, scaler, Z, sample_fn, K=200,
             wa = sample_fn(xa, z, K=K)
             wd = sample_fn(xd, z, K=K)
             xd_rep = torch.full((b * K, 1), float(disadvantaged_value))
-            fa = outcome(xd_rep, wa["w_disc"], wa["w_cont"],
-                         wa["z_rep"]).view(b, K).mean(1)
-            fd = outcome(xd_rep, wd["w_disc"], wd["w_cont"],
-                         wd["z_rep"]).view(b, K).mean(1)
+            fa_draws = outcome(
+                xd_rep, wa["w_disc"], wa["w_cont"], wa["z_rep"]
+            ).view(b, K)
+            fd_draws = outcome(
+                xd_rep, wd["w_disc"], wd["w_cont"], wd["z_rep"]
+            ).view(b, K)
+            fa, fd = fa_draws.mean(1), fd_draws.mean(1)
         ref_adv.extend(fa.numpy().tolist())
         natural_dis.extend(fd.numpy().tolist())
+        prediction_reference.append(fa_draws.numpy())
         wd_reference.append(wa["w_disc"].view(b, K, -1).numpy())
         wc_std = wa["w_cont"].numpy()
         wc_nat = (scaler.inverse_transform(wc_std)
@@ -69,6 +73,7 @@ def estimate_reference_terms(pipe, scaler, Z, sample_fn, K=200,
         ),
         "wd_reference": np.concatenate(wd_reference, axis=0),
         "wc_reference": np.concatenate(wc_reference, axis=0),
+        "prediction_reference": np.concatenate(prediction_reference, axis=0),
     }
 
 
@@ -192,6 +197,55 @@ def select_best(candidates, eta, lambda_invariance=0.0, rho_anchor=0.0):
             + rho_anchor * c.get("transport", 0.0)
         ),
     )
+
+
+def select_validity_constrained(candidates, min_success_probability):
+    """Select minimum-cost factually valid recourse or explicitly abstain."""
+    feasible = [
+        candidate for candidate in candidates
+        if candidate.get("success_probability_xi", 0.0)
+        >= min_success_probability
+    ]
+    if feasible:
+        selected = dict(min(feasible, key=lambda candidate: candidate["cost"]))
+        selected["constraint_feasible"] = True
+        selected["constraint_abstained"] = False
+        return selected
+    selected = dict(min(candidates, key=lambda candidate: candidate["cost"]))
+    selected["constraint_feasible"] = False
+    selected["constraint_abstained"] = True
+    return selected
+
+
+def select_distribution_constrained(candidates, min_success_probability,
+                                    max_outcome_wasserstein):
+    """Select minimum-cost recourse satisfying validity and outcome-W1 caps.
+
+    When no candidate is feasible, return the zero-cost factual plan and mark
+    the policy as abstaining. This keeps evaluation on the original recipient
+    population instead of silently dropping hard cases.
+    """
+    feasible = [
+        candidate for candidate in candidates
+        if (candidate.get("success_probability_xi", 0.0)
+            >= min_success_probability
+            and candidate.get("outcome_wasserstein", float("inf"))
+            <= max_outcome_wasserstein)
+    ]
+    if feasible:
+        selected = dict(min(
+            feasible,
+            key=lambda candidate: (
+                candidate["cost"], candidate["outcome_wasserstein"]
+            ),
+        ))
+        selected["constraint_feasible"] = True
+        selected["constraint_abstained"] = False
+        return selected
+    selected = dict(min(candidates, key=lambda candidate: candidate["cost"]))
+    selected["constraint_feasible"] = False
+    selected["constraint_abstained"] = True
+    return selected
 
 
 def attach_mediated_disparities(record, reference, natural_disadvantaged,

@@ -1,0 +1,10 @@
+
+============================================================
+Logistic Reg.
+============================================================
+  [Recipients]  n=  300  feasible=36.0% [31.0%,41.0%]  ΔEDUCATION=0.00  ΔJOB=0.58  ΔSAVINGS_GRP=1.18  ΔCREDIT_AMOUNT=-185.4  ΔDURATION=-1.3  cost=0.617  shortfall=0.0095  direct=+0.0407  transport_UB=0.5017  D_pre=+0.1985  D_pre_factual=+0.5290  D_post=+0.0494  factual_closure=+90.7%
+
+============================================================
+MLP (64--32)
+============================================================
+  [Recipients]  n=  300  feasible=52.0% [46.3%,57.7%]  ΔEDUCATION=0.00  ΔJOB=0.53  ΔSAVINGS_GRP=1.35  ΔCREDIT_AMOUNT=-286.4  ΔDURATION=-1.0  cost=0.635  shortfall=0.0082  direct=+0.0415  transport_UB=0.4989  D_pre=+0.2073  D_pre_factual=+0.5384  D_post=+0.0357  factual_closure=+93.4%

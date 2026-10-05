@@ -80,6 +80,11 @@ recourse:
   eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
   lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
   rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+  constrained_recourse:
+    enabled: true
+    # Matched to german_synth so both datasets share one evaluation regime.
+    min_success_probability: 0.5
+    max_outcome_wasserstein: 0.1
   n_max: 0
   n_boot: 1000
   sweep_n_max: 250

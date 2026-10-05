@@ -5,7 +5,7 @@ models, classifiers, mediation estimates, and recourse sweeps cannot be mixed.
 
 Example
 -------
-python -m evaluation.run_multiseed --datasets bar acs --seeds 42 43 44 45 46
+python -m evaluation.run_multiseed --datasets bar acs adult german oulad --seeds 42 43 44 45 46
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import sys
 
 import numpy as np
 import torch
+import yaml
 
 
 MODEL_SPECS = {
@@ -31,31 +32,44 @@ MODEL_SPECS = {
 }
 DATASET_MODELS = {
     "acs": ("Logistic Reg.", "MLP (64--32)"),
+    "adult": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "bar": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
+    "german": ("Logistic Reg.", "Random Forest"),
+    "german_synth": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
+    "oulad": ("Logistic Reg.", "MLP (64--32)"),
 }
+DATASET_FLOW_ARTIFACT = {
+    "acs": ("acs_2019_ca_ny_joint_labor_v1", ["AGEP"]),
+    "adult": ("adult_ordered_hours_ppc_v1", ["AGE"]),
+    "german": ("german_credit_acsr_all_s_paths_v2", ["AGE"]),
+    "german_synth": ("german_synth_scm_v1", ["AGE"]),
+    "oulad": ("oulad_disability_day60_engagement_v1",
+              ["AGE_MIDPOINT", "IMD_MIDPOINT", "NUM_PREV_ATTEMPTS",
+               "STUDIED_CREDITS"]),
+}
+DATASET_GAP_LABEL = {"oulad": "disability"}
 SCENARIOS = {
     "ordinary_actionable_recourse": lambda row: (
         row.get("is_ordinary_actionable_baseline", False)
-        and np.isclose(row["eta"], 10.0)
-    ),
-    "transport_anchor_only": lambda row: (
-        row.get("method") == "transport_anchor_only"
-        and np.isclose(row["eta"], 10.0)
-        and np.isclose(row["rho_anchor"], 10.0)
     ),
     "mediation_aware_recourse": lambda row: (
-        row.get("method") == "mediation_aware_recourse"
-        and row.get("is_effect_ratio_heuristic", False)
-        and np.isclose(row["eta"], 10.0)
-        and np.isclose(row["rho_anchor"], 10.0)
+        row.get("method") == "distribution_constrained_recourse"
     ),
 }
 RECOURSE_METRICS = (
     "post_recourse_mediated_prediction_disparity",
     "factual_mediated_prediction_disparity_closure",
+    "recipient_level_closure",
+    "mean_absolute_gap_reduction",
+    "overshoot_rate",
+    "overshoot_magnitude",
+    "outcome_wasserstein",
+    "constraint_feasible_rate",
+    "constraint_abstention_rate",
     "feasible_rate",
     "cost",
     "factual_closure_gain_vs_actionable_baseline",
+    "paired_absolute_gap_gain_vs_actionable_baseline",
     "cost_difference_vs_actionable_baseline",
     "feasibility_difference_vs_actionable_baseline",
 )
@@ -118,6 +132,77 @@ def _json_contains_models(path: Path, model_names: tuple[str, ...],
         return False
 
 
+def _flow_checkpoint_complete(path: Path, dataset: str) -> bool:
+    if not path.exists():
+        return False
+    specification = DATASET_FLOW_ARTIFACT.get(dataset)
+    if specification is None:
+        return True
+    try:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    except (OSError, RuntimeError):
+        return False
+    expected_version, expected_standardized = specification
+    return (
+        checkpoint.get("artifact_version") == expected_version
+        and checkpoint.get("best_posterior_predictive") is not None
+        and checkpoint.get("flow_context_standardization", {}).get("names")
+        == expected_standardized
+    )
+
+
+def _configured_min_success_probability(dataset: str) -> float | None:
+    config_path = Path(__file__).resolve().parents[1] / "conf" / "dataset" / f"{dataset}.yaml"
+    with config_path.open(encoding="utf-8") as file:
+        recourse = yaml.safe_load(file).get("recourse", {})
+    value = recourse.get("constrained_recourse", {}).get("min_success_probability")
+    return None if value is None else float(value)
+
+
+def _recourse_artifacts_complete(paths: list[Path], dataset: str) -> bool:
+    if not all(path.exists() for path in paths):
+        return False
+    min_success = _configured_min_success_probability(dataset)
+    if dataset not in {"acs", "adult", "bar", "german", "german_synth", "oulad"}:
+        return True
+    try:
+        expected_versions = (
+            {"prediction_wasserstein_constraint_v3"}
+            if dataset in {"acs", "oulad"}
+            else {
+                "prediction_wasserstein_constraint_v2",
+                "prediction_wasserstein_constraint_v3",
+            }
+        )
+        for path in paths:
+            with path.open(encoding="utf-8") as file:
+                artifact = json.load(file)
+            if artifact.get("artifact_version") not in expected_versions:
+                return False
+            methods = {row.get("method") for row in artifact.get("rows", [])}
+            if not any(
+                row.get("method") == "distribution_constrained_recourse"
+                for row in artifact.get("rows", [])
+            ):
+                return False
+            if "ordinary_actionable_recourse" not in methods:
+                return False
+            # Artifacts from a different validity target are stale.
+            if min_success is not None and any(
+                    row.get("method") in {"distribution_constrained_recourse",
+                                          "ordinary_actionable_recourse"}
+                    and abs(float(row.get("min_success_probability", float("nan")))
+                            - min_success) > 1e-9
+                    for row in artifact.get("rows", [])):
+                return False
+            if dataset in {"acs", "oulad"} and not artifact.get(
+                    "constraint_diagnostics", {}).get("coverage_vs_epsilon"):
+                return False
+    except (OSError, TypeError, json.JSONDecodeError):
+        return False
+    return True
+
+
 def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
     paths = seed_paths(root, dataset, seed)
     overrides = common_overrides(dataset, seed, paths)
@@ -128,7 +213,7 @@ def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
         for name in model_names
     ]
     outcome_metrics = paths["outcome"] / "metrics.json"
-    gap_product = paths["gaps"] / f"{dataset}_gender_gap.json"
+    gap_product = paths["gaps"] / f"{dataset}_{DATASET_GAP_LABEL.get(dataset, 'gender')}_gap.json"
     recourse_products = [
         paths["recourse"]
         / f"ablation_{dataset}_{MODEL_SPECS[name]['ablation_slug']}.json"
@@ -140,7 +225,10 @@ def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
             [sys.executable, "-m", "flows.train_flow", *overrides,
              "dataset.flow.reuse_tensors=false"],
             flow_products,
-            lambda: all(path.exists() for path in flow_products),
+            lambda: (
+                paths["tensors"].exists()
+                and _flow_checkpoint_complete(paths["flows"], dataset)
+            ),
         ),
         (
             "outcome",
@@ -161,15 +249,17 @@ def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
             "recourse",
             [sys.executable, "-m", "evaluation.ablate_recourse", *overrides],
             recourse_products,
-            lambda: all(path.exists() for path in recourse_products),
+            lambda: _recourse_artifacts_complete(recourse_products, dataset),
         ),
     ]
+    upstream_changed = False
     for stage, command, products, is_complete in stages:
-        if resume and is_complete():
+        if resume and not upstream_changed and is_complete():
             print(f"[{dataset} seed {seed}] skipping completed {stage}", flush=True)
             continue
         print(f"[{dataset} seed {seed}] starting {stage}", flush=True)
         run_logged(command, paths["logs"] / f"{stage}.log")
+        upstream_changed = True
 
 
 def _point(value):
@@ -199,13 +289,19 @@ def _one_row(rows: list[dict], predicate, description: str) -> dict:
 
 def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
     raw: list[dict] = []
+    diagnostic_raw: list[dict] = []
     for dataset in datasets:
         for seed in seeds:
             paths = seed_paths(root, dataset, seed)
+            if not _flow_checkpoint_complete(paths["flows"], dataset):
+                raise RuntimeError(
+                    f"Missing or stale flow checkpoint for {dataset} seed {seed}: "
+                    f"{paths['flows']}. Re-run without --aggregate-only."
+                )
             flow = torch.load(paths["flows"], map_location="cpu", weights_only=False)
             with (paths["outcome"] / "metrics.json").open(encoding="utf-8") as f:
                 outcome = json.load(f)
-            with (paths["gaps"] / f"{dataset}_gender_gap.json").open(
+            with (paths["gaps"] / f"{dataset}_{DATASET_GAP_LABEL.get(dataset, 'gender')}_gap.json").open(
                     encoding="utf-8") as f:
                 gaps = json.load(f)
             for model in DATASET_MODELS[dataset]:
@@ -213,6 +309,27 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                 with (paths["recourse"] / f"ablation_{dataset}_{slug}.json").open(
                         encoding="utf-8") as f:
                     ablation = json.load(f)
+                diagnostics = ablation.get("constraint_diagnostics")
+                if diagnostics is not None:
+                    diagnostic_raw.append({
+                        "dataset": dataset,
+                        "seed": seed,
+                        "model": model,
+                        "reference_validity_rate":
+                            diagnostics["reference_validity_rate"],
+                        "reference_success_probability_mean":
+                            diagnostics["reference_success_probability"]["mean"],
+                        "validity_only_coverage":
+                            diagnostics["validity_only_coverage"],
+                        "minimum_attainable_w1_mean":
+                            diagnostics[
+                                "minimum_attainable_w1_among_valid_actions"]["mean"],
+                        "minimum_attainable_w1_median":
+                            diagnostics[
+                                "minimum_attainable_w1_among_valid_actions"]["median"],
+                        "coverage_vs_epsilon":
+                            diagnostics["coverage_vs_epsilon"],
+                    })
                 base = {
                     "dataset": dataset, "seed": seed, "model": model,
                     "flow_best_val_nll": float(flow["best_val_nll"]),
@@ -257,6 +374,48 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                         [row[metric] for row in subset]
                     )
                 aggregate.append(record)
+    diagnostic_aggregate: list[dict] = []
+    for dataset in datasets:
+        for model in DATASET_MODELS[dataset]:
+            subset = [
+                row for row in diagnostic_raw
+                if row["dataset"] == dataset and row["model"] == model
+            ]
+            if not subset:
+                continue
+            record = {
+                "dataset": dataset,
+                "model": model,
+                "metrics": {
+                    metric: _stats([row[metric] for row in subset])
+                    for metric in (
+                        "reference_validity_rate",
+                        "reference_success_probability_mean",
+                        "validity_only_coverage",
+                        "minimum_attainable_w1_mean",
+                        "minimum_attainable_w1_median",
+                    )
+                },
+                "coverage_vs_epsilon": [],
+            }
+            epsilons = [
+                item["epsilon"]
+                for item in subset[0]["coverage_vs_epsilon"]
+            ]
+            for epsilon in epsilons:
+                values = [
+                    next(
+                        item["coverage"]
+                        for item in row["coverage_vs_epsilon"]
+                        if np.isclose(item["epsilon"], epsilon)
+                    )
+                    for row in subset
+                ]
+                record["coverage_vs_epsilon"].append({
+                    "epsilon": float(epsilon),
+                    "coverage": _stats(values),
+                })
+            diagnostic_aggregate.append(record)
     return {
         "metadata": {
             "seeds": seeds,
@@ -267,12 +426,15 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                 "in each seed's ablation JSON"
             ),
             "selection": (
-                "eta=10; ordinary baseline has lambda=rho=0; full method uses "
-                "lambda=|NDE/NIE| and rho=10"
+                "both methods minimize cost subject to 80% factual validity "
+                "with the same abstention rule; the primary method alone adds "
+                "a recipient-conditional prediction-W1 radius of 0.10"
             ),
         },
         "seed_level": raw,
         "aggregate": aggregate,
+        "diagnostic_seed_level": diagnostic_raw,
+        "diagnostic_aggregate": diagnostic_aggregate,
     }
 
 
@@ -300,12 +462,16 @@ def write_summary(summary: dict, output_dir: Path) -> None:
     ]
     lookup = {(row["dataset"], row["model"], row["scenario"]): row
               for row in summary["aggregate"]}
+    diagnostic_lookup = {
+        (row["dataset"], row["model"]): row
+        for row in summary.get("diagnostic_aggregate", [])
+    }
     for dataset in sorted({row["dataset"] for row in summary["aggregate"]}):
         lines += [f"## {dataset.upper()}", ""]
         for model in DATASET_MODELS[dataset]:
             lines += [f"### {model}", "",
-                      "| Method | Post disparity | Factual closure | Feasible | Cost | Closure gain vs baseline |",
-                      "|---|---:|---:|---:|---:|---:|"]
+                      "| Method | Post disparity | Recipient L1 closure | Overshoot | Constraint feasible | Cost | Paired absolute-gap gain |",
+                      "|---|---:|---:|---:|---:|---:|---:|"]
             for scenario in SCENARIOS:
                 metrics = lookup[(dataset, model, scenario)]["metrics"]
                 def cell(name: str, percent: bool = False) -> str:
@@ -315,9 +481,11 @@ def write_summary(summary: dict, output_dir: Path) -> None:
                 lines.append(
                     f"| {scenario.replace('_', ' ')} | "
                     f"{cell('post_recourse_mediated_prediction_disparity')} | "
-                    f"{cell('factual_mediated_prediction_disparity_closure', True)}% | "
-                    f"{cell('feasible_rate', True)}% | {cell('cost')} | "
-                    f"{cell('factual_closure_gain_vs_actionable_baseline', True)} pp |"
+                    f"{cell('recipient_level_closure', True)}% | "
+                    f"{cell('overshoot_rate', True)}% | "
+                    f"{cell('constraint_feasible_rate', True)}% | "
+                    f"{cell('cost')} | "
+                    f"{cell('paired_absolute_gap_gain_vs_actionable_baseline')} |"
                 )
             common = lookup[(dataset, model, "mediation_aware_recourse")]["metrics"]
             lines += ["", (
@@ -327,13 +495,42 @@ def write_summary(summary: dict, output_dir: Path) -> None:
                 f"TE: {common['total_effect']['mean']:+.3f} ± "
                 f"{common['total_effect']['sd']:.3f}."
             ), ""]
+            diagnostics = diagnostic_lookup.get((dataset, model))
+            if diagnostics is not None:
+                metrics = diagnostics["metrics"]
+                lines += [
+                    "Constraint compatibility diagnostics:", "",
+                    (
+                        "Reference-valid: "
+                        f"{100 * metrics['reference_validity_rate']['mean']:.1f}% "
+                        f"± {100 * metrics['reference_validity_rate']['sd']:.1f}%; "
+                        "valid-action coverage: "
+                        f"{100 * metrics['validity_only_coverage']['mean']:.1f}% "
+                        f"± {100 * metrics['validity_only_coverage']['sd']:.1f}%; "
+                        "median minimum attainable W1: "
+                        f"{metrics['minimum_attainable_w1_median']['mean']:.3f} "
+                        f"± {metrics['minimum_attainable_w1_median']['sd']:.3f}."
+                    ),
+                    "",
+                    "| Epsilon | Joint coverage |",
+                    "|---:|---:|",
+                ]
+                for item in diagnostics["coverage_vs_epsilon"]:
+                    stats = item["coverage"]
+                    lines.append(
+                        f"| {item['epsilon']:.3f} | "
+                        f"{100 * stats['mean']:.1f}% ± "
+                        f"{100 * stats['sd']:.1f}% |"
+                    )
+                lines.append("")
     (output_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--datasets", nargs="+", choices=("bar", "acs"),
-                        default=["bar", "acs"])
+    parser.add_argument(
+        "--datasets", nargs="+", choices=("bar", "acs", "adult", "german", "german_synth", "oulad"),
+        default=["bar", "acs", "adult", "german"])
     parser.add_argument("--seeds", nargs="+", type=int,
                         default=[42, 43, 44, 45, 46])
     parser.add_argument("--root", type=Path,

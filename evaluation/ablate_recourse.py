@@ -30,7 +30,9 @@ from evaluation.recourse_metrics import (
     attach_mediated_disparities,
     estimate_reference_terms,
     select_best,
+    select_distribution_constrained,
     select_recourse_indices,
+    select_validity_constrained,
 )
 from flows.diagnostics import make_sample_fns
 from flows.models import load_flow_models
@@ -48,6 +50,80 @@ def _ci(values, n_boot, rng):
             float(np.percentile(means, 97.5))]
 
 
+def _finite_summary(values):
+    values = np.asarray(values, dtype=float)
+    finite = values[np.isfinite(values)]
+    if not len(finite):
+        return {
+            "n": 0, "mean": None, "sd": None, "min": None,
+            "q25": None, "median": None, "q75": None, "q90": None,
+            "max": None,
+        }
+    return {
+        "n": int(len(finite)),
+        "mean": float(finite.mean()),
+        "sd": float(finite.std(ddof=1)) if len(finite) > 1 else 0.0,
+        "min": float(finite.min()),
+        "q25": float(np.percentile(finite, 25)),
+        "median": float(np.median(finite)),
+        "q75": float(np.percentile(finite, 75)),
+        "q90": float(np.percentile(finite, 90)),
+        "max": float(finite.max()),
+    }
+
+
+def compute_constraint_diagnostics(
+        all_candidates, prediction_reference, threshold,
+        min_success_probability, epsilon_grid):
+    """Diagnose compatibility of validity with the prediction-W1 target."""
+    prediction_reference = np.asarray(prediction_reference, dtype=float)
+    reference_success = (prediction_reference >= threshold).mean(axis=1)
+    reference_valid = reference_success >= min_success_probability
+
+    minimum_w1 = []
+    for candidates in all_candidates:
+        valid = [
+            candidate["outcome_wasserstein"]
+            for candidate in candidates
+            if candidate.get("success_probability_xi", 0.0)
+            >= min_success_probability
+            and np.isfinite(candidate.get("outcome_wasserstein", np.nan))
+        ]
+        minimum_w1.append(min(valid) if valid else np.nan)
+    minimum_w1 = np.asarray(minimum_w1, dtype=float)
+    validity_feasible = np.isfinite(minimum_w1)
+
+    coverage = []
+    for epsilon in sorted(set(float(value) for value in epsilon_grid)):
+        feasible = validity_feasible & (minimum_w1 <= epsilon)
+
+        def conditional_rate(mask):
+            return (float(feasible[mask].mean()) if mask.any() else None)
+
+        coverage.append({
+            "epsilon": epsilon,
+            "coverage": float(feasible.mean()),
+            "n_feasible": int(feasible.sum()),
+            "coverage_reference_valid": conditional_rate(reference_valid),
+            "n_reference_valid": int(reference_valid.sum()),
+            "coverage_reference_invalid": conditional_rate(~reference_valid),
+            "n_reference_invalid": int((~reference_valid).sum()),
+        })
+
+    return {
+        "n_recipients": int(len(all_candidates)),
+        "classifier_threshold": float(threshold),
+        "min_success_probability": float(min_success_probability),
+        "reference_success_probability": _finite_summary(reference_success),
+        "reference_validity_rate": float(reference_valid.mean()),
+        "reference_validity_n": int(reference_valid.sum()),
+        "validity_only_coverage": float(validity_feasible.mean()),
+        "validity_only_n": int(validity_feasible.sum()),
+        "minimum_attainable_w1_among_valid_actions": _finite_summary(minimum_w1),
+        "coverage_vs_epsilon": coverage,
+    }
+
+
 def summarize(records, n_boot=1000, rng_seed=0):
     rng = np.random.default_rng(rng_seed)
     fields = ("cost", "shortfall", "direct_effect", "transport",
@@ -56,8 +132,20 @@ def summarize(records, n_boot=1000, rng_seed=0):
               "post_recourse_mediated_prediction_disparity")
     result = {field: _ci([r[field] for r in records], n_boot, rng)
               for field in fields}
+    if all("outcome_wasserstein" in r for r in records):
+        result["outcome_wasserstein"] = _ci(
+            [r["outcome_wasserstein"] for r in records], n_boot, rng
+        )
     result["feasible_rate"] = _ci(
         [float(r["shortfall"] <= 1e-12) for r in records], n_boot, rng
+    )
+    result["constraint_feasible_rate"] = _ci(
+        [float(r.get("constraint_feasible", False)) for r in records],
+        n_boot, rng,
+    )
+    result["constraint_abstention_rate"] = _ci(
+        [float(r.get("constraint_abstained", False)) for r in records],
+        n_boot, rng,
     )
     pre = np.asarray([
         r["pre_recourse_factual_mediated_prediction_disparity"] for r in records
@@ -65,6 +153,8 @@ def summarize(records, n_boot=1000, rng_seed=0):
     post = np.asarray([
         r["post_recourse_mediated_prediction_disparity"] for r in records
     ])
+    result["mean_absolute_gap_reduction"] = _ci(
+        np.abs(pre) - np.abs(post), n_boot, rng)
     point = (1.0 - abs(post.mean()) / abs(pre.mean())
              if abs(pre.mean()) > 1e-12 else np.nan)
     boot = []
@@ -77,6 +167,22 @@ def summarize(records, n_boot=1000, rng_seed=0):
         float(point), float(np.nanpercentile(boot, 2.5)),
         float(np.nanpercentile(boot, 97.5))
     ]
+    point_l1 = (1.0 - np.abs(post).mean() / np.abs(pre).mean()
+                if np.abs(pre).mean() > 1e-12 else np.nan)
+    boot_l1 = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, len(records), len(records))
+        denominator = np.abs(pre[idx]).mean()
+        boot_l1.append(1.0 - np.abs(post[idx]).mean() / denominator
+                       if denominator > 1e-12 else np.nan)
+    result["recipient_level_closure"] = [
+        float(point_l1), float(np.nanpercentile(boot_l1, 2.5)),
+        float(np.nanpercentile(boot_l1, 97.5)),
+    ]
+    result["overshoot_rate"] = _ci(
+        ((pre * post) < 0.0).astype(float), n_boot, rng)
+    result["overshoot_magnitude"] = _ci(
+        np.maximum(-np.sign(pre) * post, 0.0), n_boot, rng)
     result["n"] = len(records)
     return result
 
@@ -99,10 +205,12 @@ def _paired_baseline_differences(records, baseline_records, n_boot=1000,
     cost = np.asarray([r["cost"] for r in records], dtype=float)
     cost_baseline = np.asarray([r["cost"] for r in baseline_records], dtype=float)
     feasible = np.asarray([
-        float(r["shortfall"] <= 1e-12) for r in records
+        float(r.get("constraint_feasible", r["shortfall"] <= 1e-12))
+        for r in records
     ])
     feasible_baseline = np.asarray([
-        float(r["shortfall"] <= 1e-12) for r in baseline_records
+        float(r.get("constraint_feasible", r["shortfall"] <= 1e-12))
+        for r in baseline_records
     ])
 
     def closure(pre_values, post_values):
@@ -114,6 +222,7 @@ def _paired_baseline_differences(records, baseline_records, n_boot=1000,
         closure(pre, post) - closure(pre, post_baseline),
         (cost - cost_baseline).mean(),
         (feasible - feasible_baseline).mean(),
+        (np.abs(post_baseline) - np.abs(post)).mean(),
     ])
     boots = []
     for _ in range(n_boot):
@@ -123,6 +232,7 @@ def _paired_baseline_differences(records, baseline_records, n_boot=1000,
             - closure(pre[idx], post_baseline[idx]),
             (cost[idx] - cost_baseline[idx]).mean(),
             (feasible[idx] - feasible_baseline[idx]).mean(),
+            (np.abs(post_baseline[idx]) - np.abs(post[idx])).mean(),
         ])
     boots = np.asarray(boots)
     return {
@@ -138,11 +248,16 @@ def _paired_baseline_differences(records, baseline_records, n_boot=1000,
             float(point[2]), float(np.percentile(boots[:, 2], 2.5)),
             float(np.percentile(boots[:, 2], 97.5)),
         ],
+        "paired_absolute_gap_gain_vs_actionable_baseline": [
+            float(point[3]), float(np.percentile(boots[:, 3], 2.5)),
+            float(np.percentile(boots[:, 3], 97.5)),
+        ],
     }
 
 
 def run_grid(all_candidates, references, factual_predictions, eta_grid,
-             lambda_grid, rho_grid, disadvantaged_value, n_boot):
+             lambda_grid, rho_grid, disadvantaged_value, n_boot,
+             constrained_config=None):
     rows = []
     selected_record_sets = []
     for rho in rho_grid:
@@ -161,7 +276,7 @@ def run_grid(all_candidates, references, factual_predictions, eta_grid,
                 summary.update(eta=float(eta), lambda_invariance=float(lam),
                                rho_anchor=float(rho))
                 if lam == 0.0 and rho == 0.0:
-                    method = "ordinary_actionable_recourse"
+                    method = "soft_objective_recourse"
                 elif lam > 0.0 and rho == 0.0:
                     method = "direct_invariance_only"
                 elif lam == 0.0 and rho > 0.0:
@@ -169,19 +284,81 @@ def run_grid(all_candidates, references, factual_predictions, eta_grid,
                 else:
                     method = "mediation_aware_recourse"
                 summary["method"] = method
-                summary["is_ordinary_actionable_baseline"] = (
-                    method == "ordinary_actionable_recourse"
-                )
+                summary["is_ordinary_actionable_baseline"] = False
                 rows.append(summary)
                 selected_record_sets.append(records)
-    baseline_records = {
+    if constrained_config is not None:
+        records = []
+        for i, candidates in enumerate(all_candidates):
+            best = dict(select_validity_constrained(
+                candidates,
+                constrained_config["min_success_probability"],
+            ))
+            attach_mediated_disparities(
+                best, references["reference"][i],
+                references["natural_disadvantaged"][i],
+                factual_predictions[i], disadvantaged_value,
+            )
+            records.append(best)
+        summary = summarize(records, n_boot=n_boot)
+        summary.update(
+            eta=0.0,
+            lambda_invariance=0.0,
+            rho_anchor=0.0,
+            min_success_probability=float(
+                constrained_config["min_success_probability"]),
+            max_outcome_wasserstein=None,
+            method="ordinary_actionable_recourse",
+            is_ordinary_actionable_baseline=True,
+        )
+        rows.append(summary)
+        selected_record_sets.append(records)
+
+        records = []
+        for i, candidates in enumerate(all_candidates):
+            best = dict(select_distribution_constrained(
+                candidates,
+                constrained_config["min_success_probability"],
+                constrained_config["max_outcome_wasserstein"],
+            ))
+            attach_mediated_disparities(
+                best, references["reference"][i],
+                references["natural_disadvantaged"][i],
+                factual_predictions[i], disadvantaged_value,
+            )
+            records.append(best)
+        summary = summarize(records, n_boot=n_boot)
+        summary.update(
+            eta=float(constrained_config["comparison_eta"]),
+            lambda_invariance=0.0,
+            rho_anchor=0.0,
+            min_success_probability=float(
+                constrained_config["min_success_probability"]),
+            max_outcome_wasserstein=float(
+                constrained_config["max_outcome_wasserstein"]),
+            method="distribution_constrained_recourse",
+            is_ordinary_actionable_baseline=False,
+        )
+        rows.append(summary)
+        selected_record_sets.append(records)
+    soft_baseline_records = {
         row["eta"]: records
         for row, records in zip(rows, selected_record_sets)
-        if row["is_ordinary_actionable_baseline"]
+        if row["method"] == "soft_objective_recourse"
     }
+    clean_baseline_records = next(
+        records for row, records in zip(rows, selected_record_sets)
+        if row["is_ordinary_actionable_baseline"]
+    ) if constrained_config is not None else None
     for row, records in zip(rows, selected_record_sets):
+        if row["method"] in (
+                "ordinary_actionable_recourse",
+                "distribution_constrained_recourse"):
+            comparison_records = clean_baseline_records
+        else:
+            comparison_records = soft_baseline_records[row["eta"]]
         row.update(_paired_baseline_differences(
-            records, baseline_records[row["eta"]], n_boot=n_boot
+            records, comparison_records, n_boot=n_boot
         ))
     return rows
 
@@ -230,10 +407,12 @@ def _latex(rows, model_name, label):
              r"\midrule"]
     for row in rows:
         method = {
+            "soft_objective_recourse": "Legacy soft objective",
             "ordinary_actionable_recourse": "Actionable baseline",
             "direct_invariance_only": "Invariance only",
             "transport_anchor_only": "Anchor only",
             "mediation_aware_recourse": "Full",
+            "distribution_constrained_recourse": "Distribution constrained",
         }[row["method"]]
         lines.append(
             f"{method} & {row['eta']:g} & {row['lambda_invariance']:g} & "
@@ -317,6 +496,7 @@ def run(cfg):
                     float(rec.threshold), float(rec.nu),
                     g_phi, f_theta, schema, device,
                     references["wd_reference"][i], references["wc_reference"][i],
+                    references["prediction_reference"][i],
                     n_samples=int(rec.get("intervention_K", 32)),
                     same_level=str(rec.get(
                         "same_level_semantics", "preserve_factual"
@@ -358,15 +538,54 @@ def run(cfg):
         eta_grid = [float(v) for v in rec.eta_grid]
         lambda_grid = [float(v) for v in rec.lambda_grid]
         heuristic = _effect_ratio(
-            f"{cfg.dataset.paths.gaps_dir}/{cfg.dataset.name}_gender_gap.json", name
+            f"{cfg.dataset.paths.gaps_dir}/{cfg.dataset.name}_{cfg.dataset.gap.get('output_label', 'gender')}_gap.json", name
         )
         if heuristic is not None and np.isfinite(heuristic):
             lambda_grid = sorted(set(lambda_grid + [heuristic]))
             print(f"  marked heuristic λ=|NDE/NIE|={heuristic:.4g}; not a calibration")
         rho_grid = [float(v) for v in rec.rho_grid]
+        constrained_config = None
+        constraint_diagnostics = None
+        if bool(rec.get("constrained_recourse", {}).get("enabled", False)):
+            if not propagate:
+                raise ValueError(
+                    "Distribution-constrained recourse requires propagated "
+                    "intervention draws."
+                )
+            constrained_config = {
+                "min_success_probability": float(
+                    rec.constrained_recourse.min_success_probability),
+                "max_outcome_wasserstein": float(
+                    rec.constrained_recourse.max_outcome_wasserstein),
+                "comparison_eta": float(rec.eta),
+            }
+            epsilon_grid = list(rec.constrained_recourse.get(
+                "epsilon_diagnostic_grid",
+                [0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5],
+            ))
+            constraint_diagnostics = compute_constraint_diagnostics(
+                candidates, references["prediction_reference"],
+                float(rec.threshold),
+                constrained_config["min_success_probability"],
+                epsilon_grid,
+            )
+            w1_summary = constraint_diagnostics[
+                "minimum_attainable_w1_among_valid_actions"]
+            print(
+                "  constraint diagnostics: reference-valid="
+                f"{100 * constraint_diagnostics['reference_validity_rate']:.1f}%, "
+                "valid-action coverage="
+                f"{100 * constraint_diagnostics['validity_only_coverage']:.1f}%, "
+                f"median min-W1={w1_summary['median']}"
+            )
+            print("  coverage by epsilon: " + "; ".join(
+                f"{item['epsilon']:g}="
+                f"{100 * item['coverage']:.1f}%"
+                for item in constraint_diagnostics["coverage_vs_epsilon"]
+            ))
         rows = run_grid(candidates, references, factual_predictions, eta_grid,
                         lambda_grid, rho_grid, int(rec.disadvantaged_value),
-                        int(rec.n_boot))
+                        int(rec.n_boot), constrained_config)
         for row in rows:
             row["is_effect_ratio_heuristic"] = bool(
                 heuristic is not None and
@@ -397,7 +616,10 @@ def run(cfg):
         tex_path = f"{out_dir}/ablation_{cfg.dataset.name}_{slug}.tex"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump({"model": name, "seed": int(cfg.seed),
-                "objective": "cost + eta*shortfall + lambda*direct_effect + rho*transport",
+                "artifact_version": "prediction_wasserstein_constraint_v3",
+                "legacy_soft_objective": (
+                    "cost + eta*shortfall + lambda*direct_effect + rho*transport"
+                ),
                 "threshold": float(rec.threshold), "nu": float(rec.nu),
                 "reference_K": int(rec.reference_K),
                 "intervention_K": int(rec.get("intervention_K", 1)),
@@ -412,22 +634,41 @@ def run(cfg):
                     else "joint_point_mass_w1"
                 ),
                 "ordinary_actionable_recourse_baseline": {
+                    "min_success_probability": (
+                        constrained_config["min_success_probability"]
+                        if constrained_config is not None else None
+                    ),
                     "lambda_invariance": 0.0,
                     "rho_anchor": 0.0,
                     "description": (
-                        "minimum-cost validity recourse with the same action "
-                        "set and descendant-propagation semantics"
+                        "minimum cost subject to the same factual chance-"
+                        "validity constraint and abstention rule as the primary "
+                        "method, without the prediction-Wasserstein constraint"
                     ),
                 },
+                "distribution_constrained_recourse": constrained_config,
+                "constraint_diagnostics": constraint_diagnostics,
+                "distribution_constrained_objective": (
+                    "minimize cost subject to factual success probability and "
+                    "recipient-conditional prediction-Wasserstein constraints; "
+                    "return the factual plan and mark abstention if infeasible"
+                ),
                 "factual_closure_estimand": (
                     "1 - abs(mean(post_recourse_mediated_prediction_disparity)) "
                     "/ abs(mean(pre_recourse_factual_mediated_prediction_disparity))"
+                ),
+                "recipient_level_closure_estimand": (
+                    "1 - mean(abs(post_recourse_mediated_prediction_disparity)) "
+                    "/ mean(abs(pre_recourse_factual_mediated_prediction_disparity))"
                 ),
                 "interval_scope": "individual bootstrap; fitted models held fixed",
                 "population": {
                 "group": int(rec.disadvantaged_value), "Y": 0,
                 "prediction": 0, "n": len(idx),
-            }, "reference": "direct draws W|X=advantaged,Z_recipient",
+            }, "reference": (
+                "prediction draws under W|X=advantaged,Z_recipient with "
+                "the recipient's Z held fixed"
+            ),
                 "sweep_association": association, "rows": rows}, f, indent=2)
         flat = [_flatten(row) | {"is_effect_ratio_heuristic":
                                  row["is_effect_ratio_heuristic"]}

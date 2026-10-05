@@ -1,7 +1,7 @@
 """
 evaluation/compute_recourse.py — Generic Hydra entry point for counterfactual recourse.
 
-Run: python -m evaluation.compute_recourse [dataset=acs|bar]
+Run: python -m evaluation.compute_recourse [dataset=acs|adult|bar|german]
 """
 
 import os
@@ -15,6 +15,7 @@ import joblib
 
 import hydra
 from omegaconf import OmegaConf
+from scipy.stats import wasserstein_distance
 
 from data.build_tensors import stack_sfm_features
 from flows.interventions import sample_intervention_batch
@@ -85,10 +86,14 @@ def _build_candidate_arrays(xi_val, zi_np, wdi_np, wci_natural,
         cur_val = int(wdi_np[i])
         disc_cur.append(cur_val)
         actionable = spec.get("actionable", "free")
-        if actionable == "monotone_up":
+        if actionable == "fixed":
+            grid = [cur_val]
+        elif actionable == "monotone_up":
             grid = list(range(cur_val, n_cats))
-        else:
+        elif actionable == "free":
             grid = list(range(n_cats))
+        else:
+            raise ValueError(f"Unsupported actionability for {name}: {actionable}")
         disc_grids.append(grid)
 
     cont_grids = []
@@ -101,10 +106,19 @@ def _build_candidate_arrays(xi_val, zi_np, wdi_np, wci_natural,
         cont_cur.append(cur_val)
         clip_lo = clip[0] if clip[0] is not None else cur_val
         clip_hi = clip[1] if clip[1] is not None else cur_val
-        grid = np.clip(
-            np.arange(cur_val, clip_hi + step, step),
-            clip_lo, clip_hi,
-        ).astype(np.float32)
+        actionable = spec.get("actionable", "monotone_up")
+        if actionable == "fixed":
+            grid = np.asarray([cur_val], dtype=np.float32)
+        elif actionable == "monotone_down":
+            grid = np.append(np.arange(clip_lo, cur_val, step), cur_val)
+        elif actionable == "monotone_up":
+            grid = np.append(np.arange(cur_val, clip_hi, step), clip_hi)
+        elif actionable == "free":
+            grid = np.append(np.arange(clip_lo, clip_hi, step), clip_hi)
+            grid = np.append(grid, cur_val)
+        else:
+            raise ValueError(f"Unsupported actionability for {name}: {actionable}")
+        grid = np.unique(np.clip(grid, clip_lo, clip_hi)).astype(np.float32)
         cont_grids.append(grid)
 
     # Cartesian product
@@ -248,7 +262,7 @@ def precompute_interventional_candidates_batch(
         pipe, scaler, xi, zi, wdi, wci,
         disc_names, cont_names, mediator_specs, vocab, weights,
         threshold, nu, g_phi, f_theta, schema, device,
-        reference_wd, reference_wc, n_samples=32,
+        reference_wd, reference_wc, reference_prediction=None, n_samples=32,
         same_level="preserve_factual"):
     """Evaluate direct action plans after propagating strict descendants.
 
@@ -311,6 +325,14 @@ def precompute_interventional_candidates_batch(
         np.maximum(0.0, soft_thr - p_actual_draws)
         + np.maximum(0.0, soft_thr - p_cf_draws)
     ).mean(axis=1)
+    if reference_prediction is None:
+        outcome_wasserstein = np.full(n_plans, np.nan)
+    else:
+        reference_prediction = np.asarray(reference_prediction, dtype=float)
+        outcome_wasserstein = np.asarray([
+            wasserstein_distance(draws, reference_prediction)
+            for draws in p_actual_draws
+        ])
 
     candidates = []
     for i in range(n_plans):
@@ -320,8 +342,9 @@ def precompute_interventional_candidates_batch(
             p_xi=float(p_actual_draws[i].mean()),
             p_xcf=float(p_cf_draws[i].mean()),
             direct_effect=float(np.abs(p_cf_draws[i] - p_actual_draws[i]).mean()),
-            success_probability_xi=float((p_actual_draws[i] >= soft_thr).mean()),
-            success_probability_xcf=float((p_cf_draws[i] >= soft_thr).mean()),
+            success_probability_xi=float((p_actual_draws[i] >= threshold).mean()),
+            success_probability_xcf=float((p_cf_draws[i] >= threshold).mean()),
+            outcome_wasserstein=float(outcome_wasserstein[i]),
             outcome_sd_xi=float(p_actual_draws[i].std()),
             outcome_sd_xcf=float(p_cf_draws[i].std()),
             intervention_semantics="propagate_strict_descendants",
@@ -401,6 +424,7 @@ def run_recourse_batch(pipe, scaler, data, disc_names, cont_names,
                 disc_names, cont_names, mediator_specs, vocab, weights,
                 threshold, nu, g_phi, f_theta, schema, device,
                 references["wd_reference"][k], references["wc_reference"][k],
+                references["prediction_reference"][k],
                 n_samples=intervention_K,
                 same_level=same_level_semantics,
             )

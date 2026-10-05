@@ -6,6 +6,7 @@ outcome Y. For baseline x0 and contrast x1 we estimate
 the total effect is estimated directly and is never constructed as NDE + NIE.
 """
 
+import importlib
 import json
 import os
 import time
@@ -182,6 +183,58 @@ def make_summary(results, model_names):
     return text
 
 
+_EFFECTS = ("nde", "nie", "tnde", "tnie", "te", "interaction")
+
+
+def compute_oracle_comparison(oracle_module, pipe, scaler, data, flow_res,
+                              K, n_inst, n_boot, rng_seed=0):
+    """Re-score the classifier with true-SCM mediator draws.
+
+    Uses the same evaluation instances as the flow estimate (same
+    ``rng_seed``), so ``flow - oracle`` isolates mediator-model error;
+    ``oracle`` minus the outcome-scale truth isolates classifier error.
+    """
+    module = importlib.import_module(oracle_module)
+    oracle_fn = module.make_oracle_sample_fn(scaler, seed=rng_seed + 1)
+    oracle_res = compute_gap_stats(pipe, scaler, data, oracle_fn, K, n_inst,
+                                   n_boot, rng_seed=rng_seed)
+    flow = {e: flow_res["overall"][e][0] for e in _EFFECTS}
+    oracle = {e: oracle_res["overall"][e][0] for e in _EFFECTS}
+    return {
+        "flow": flow,
+        "oracle": oracle,
+        "oracle_ci": {e: list(oracle_res["overall"][e]) for e in _EFFECTS},
+        "flow_minus_oracle": {e: flow[e] - oracle[e] for e in _EFFECTS},
+    }
+
+
+def outcome_scale_truth(oracle_module, data, K, n_inst, rng_seed=0):
+    """True effects on P(Y=1) over the same evaluation instances."""
+    module = importlib.import_module(oracle_module)
+    rng = np.random.default_rng(rng_seed)
+    n = min(int(n_inst), len(data["X_va"]))
+    idx = np.sort(rng.choice(len(data["X_va"]), n, replace=False))
+    ages = np.repeat(data["Z_va"][idx, 0].numpy(), int(K))
+    truth = module.oracle_mediation_effects(ages=ages, seed=rng_seed + 2)
+    return {e: truth[e] for e in ("nde", "nie", "te", "interaction")}
+
+
+def make_oracle_summary(comparisons, truth):
+    lines = ["Outcome-scale truth P(Y=1): " + "  ".join(
+        f"{e}={truth[e]:+.4f}" for e in ("nde", "nie", "te"))]
+    for name, comp in comparisons.items():
+        lines.append(f"{name}")
+        for e in ("nde", "nie", "te"):
+            lines.append(
+                f"  {e.upper():>3}: flow={comp['flow'][e]:+.4f}  "
+                f"oracle={comp['oracle'][e]:+.4f}  "
+                f"flow-oracle={comp['flow_minus_oracle'][e]:+.4f}"
+            )
+    text = "\n".join(lines)
+    print("\n" + text)
+    return text
+
+
 @hydra.main(config_path="../conf", config_name="config", version_base="1.1")
 def main(cfg):
     torch.manual_seed(int(cfg.seed))
@@ -208,7 +261,7 @@ def main(cfg):
 
     out_dir = cfg.dataset.paths.gaps_dir
     os.makedirs(out_dir, exist_ok=True)
-    stem = f"{out_dir}/{cfg.dataset.name}_gender_gap"
+    stem = f"{out_dir}/{cfg.dataset.name}_{gap_cfg.get('output_label', 'gender')}_gap"
     summary = make_summary(results, names)
     table = make_table(
         results, names,
@@ -244,6 +297,30 @@ def main(cfg):
     with open(stem + "_overall.tex", "w", encoding="utf-8") as f:
         f.write(table)
     print(f"\nSaved → {stem}.json/.txt and {stem}_overall.tex")
+
+    oracle_module = gap_cfg.get("oracle_module")
+    if oracle_module:
+        print("\n[Oracle: true-SCM mediator draws]")
+        comparisons = {}
+        for spec, name, res in zip(specs, names, results):
+            slug = {"logreg": "logreg", "mlp": "mlp"}.get(spec["type"],
+                                                          spec["type"])
+            pipe = joblib.load(f"{cfg.dataset.paths.outcome_dir}/{slug}.joblib")
+            print(f"  [{name}]")
+            comparisons[name] = compute_oracle_comparison(
+                oracle_module, pipe, scaler, data, res, gap_cfg.K,
+                gap_cfg.n_inst, gap_cfg.n_boot, rng_seed=int(cfg.seed),
+            )
+        truth = outcome_scale_truth(oracle_module, data, gap_cfg.K,
+                                    gap_cfg.n_inst, rng_seed=int(cfg.seed))
+        oracle_summary = make_oracle_summary(comparisons, truth)
+        with open(stem + "_oracle.json", "w", encoding="utf-8") as f:
+            json.dump({"outcome_scale_truth": truth, "models": comparisons,
+                       "_metadata": snapshot["_metadata"]
+                       | {"oracle_module": oracle_module}}, f, indent=2)
+        with open(stem + "_oracle.txt", "w", encoding="utf-8") as f:
+            f.write(oracle_summary)
+        print(f"\nSaved → {stem}_oracle.json/.txt")
 
 
 if __name__ == "__main__":

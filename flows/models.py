@@ -23,6 +23,25 @@ from nflows.distributions import StandardNormal
 from data.build_tensors import build_tensors  # noqa: F401
 
 
+def _z_standardization(dim_z, z_mean=None, z_scale=None):
+    """Return validated, broadcastable confounder-normalization tensors."""
+    mean = (torch.zeros(dim_z, dtype=torch.float32) if z_mean is None
+            else torch.as_tensor(z_mean, dtype=torch.float32))
+    scale = (torch.ones(dim_z, dtype=torch.float32) if z_scale is None
+             else torch.as_tensor(z_scale, dtype=torch.float32))
+    if mean.numel() != dim_z or scale.numel() != dim_z:
+        raise ValueError("z_mean and z_scale must have one value per confounder.")
+    if torch.any(scale <= 0):
+        raise ValueError("Every z_scale value must be positive.")
+    return mean.reshape(1, dim_z), scale.reshape(1, dim_z)
+
+
+def _normalize_z(z, mean, scale):
+    if z.shape[1] == 0:
+        return z
+    return (z - mean) / scale
+
+
 class DiscreteMediator(nn.Module):
     """Conditional model for discrete mediators.
 
@@ -32,22 +51,29 @@ class DiscreteMediator(nn.Module):
 
         p(w_d | x, z) = product_j p(w_j | pa(w_j), x, z).
 
-    Only mediators in strictly earlier blocks are parents.  Thus an internal
-    tensor/flow coordinate order is never interpreted as a causal relation
-    between variables in the same block.
+    By default, only mediators in strictly earlier causal blocks are parents.
+    ``within_block_autoregressive=True`` additionally factorizes a joint
+    same-level categorical density in coordinate order.  That statistical
+    factorization does not add within-block causal edges.
     """
 
     def __init__(self, dim_x: int, dim_z: int, vocab: dict,
                  hidden_dim: int = 64, n_layers: int = 2,
                  autoregressive: bool = False, embed_dim: int = 4,
-                 layers=None):
+                 layers=None, within_block_autoregressive: bool = False,
+                 z_mean=None, z_scale=None):
         super().__init__()
         self.vocab     = vocab
         self.col_names = list(vocab.keys())
         self.autoregressive = autoregressive
         n_cats = list(vocab.values())
+        self.within_block_autoregressive = within_block_autoregressive
         self.cardinalities = n_cats
         in_dim = dim_x + dim_z
+        mean, scale = _z_standardization(dim_z, z_mean, z_scale)
+        # Stats are serialized in the constructor config, not the state dict.
+        self.register_buffer("_z_mean", mean, persistent=False)
+        self.register_buffer("_z_scale", scale, persistent=False)
 
         # None is intentionally the historical left-to-right factorization,
         # preserving compatibility with old checkpoints.  New checkpoints
@@ -78,7 +104,9 @@ class DiscreteMediator(nn.Module):
             else:
                 parents = [
                     k for k, parent in enumerate(self.col_names)
-                    if layer_by_name[parent] < layer_by_name[name]
+                    if (layer_by_name[parent] < layer_by_name[name]
+                        or (within_block_autoregressive
+                            and layer_by_name[parent] == layer_by_name[name] and k < j))
                 ]
                 if any(k >= j for k in parents):
                     raise ValueError(
@@ -114,6 +142,7 @@ class DiscreteMediator(nn.Module):
                 self.heads.append(nn.Sequential(*head_layers))
 
     def _cond(self, x, z):
+        z = _normalize_z(z, self._z_mean, self._z_scale)
         parts = [p for p in [x, z] if p.shape[1] > 0]
         return torch.cat(parts, dim=1) if parts else None
 
@@ -198,13 +227,18 @@ class ContinuousMediatorFlow(nn.Module):
     def __init__(self, dim_wc: int, dim_x: int, dim_z: int, vocab: dict,
                  embed_dim: int = 4, hidden_features: int = 64,
                  n_flow_layers: int = 4, n_blocks: int = 2,
-                 num_bins: int = 8, tail_bound: float = 3.0):
+                 num_bins: int = 8, tail_bound: float = 3.0,
+                 condition_on_x: bool = True, z_mean=None, z_scale=None):
         super().__init__()
         self.dim_wc = dim_wc
+        self.condition_on_x = condition_on_x
         self.embeddings = nn.ModuleList([
             nn.Embedding(n_cats, embed_dim) for n_cats in vocab.values()
         ])
-        self.dim_context = len(vocab) * embed_dim + dim_x + dim_z
+        self.dim_context = len(vocab) * embed_dim + (dim_x if condition_on_x else 0) + dim_z
+        mean, scale = _z_standardization(dim_z, z_mean, z_scale)
+        self.register_buffer("_z_mean", mean, persistent=False)
+        self.register_buffer("_z_scale", scale, persistent=False)
 
         if dim_wc == 0:
             self.flow = None
@@ -235,7 +269,10 @@ class ContinuousMediatorFlow(nn.Module):
 
     def _context(self, w_disc, x, z):
         parts = [emb(w_disc[:, i]) for i, emb in enumerate(self.embeddings)]
-        parts += [p for p in [x, z] if p.shape[1] > 0]
+        z = _normalize_z(z, self._z_mean, self._z_scale)
+        if self.condition_on_x and x.shape[1] > 0:
+            parts.append(x)
+        parts += [z] if z.shape[1] > 0 else []
         return torch.cat(parts, dim=1) if parts else None
 
     def log_prob(self, w_cont, w_disc, x, z):
@@ -293,21 +330,29 @@ class ConditionalGaussian(nn.Module):
     """Simple diagonal Gaussian baseline for P(W_cont | W_disc,X,Z)."""
 
     def __init__(self, dim_wc: int, dim_x: int, dim_z: int, vocab: dict,
-                 embed_dim: int = 4, hidden_features: int = 64, **unused):
+                 embed_dim: int = 4, hidden_features: int = 64,
+                 condition_on_x: bool = True, z_mean=None, z_scale=None, **unused):
         super().__init__()
         self.dim_wc = dim_wc
+        self.condition_on_x = condition_on_x
         self.embeddings = nn.ModuleList([
             nn.Embedding(n_cats, embed_dim) for n_cats in vocab.values()
         ])
-        context_dim = len(vocab) * embed_dim + dim_x + dim_z
+        mean, scale = _z_standardization(dim_z, z_mean, z_scale)
+        self.register_buffer("_z_mean", mean, persistent=False)
+        self.register_buffer("_z_scale", scale, persistent=False)
+        context_dim = len(vocab) * embed_dim + (dim_x if condition_on_x else 0) + dim_z
         self.network = None if dim_wc == 0 else nn.Sequential(
             nn.Linear(context_dim, hidden_features), nn.ReLU(),
             nn.Linear(hidden_features, 2 * dim_wc),
         )
 
     def _context(self, w_disc, x, z):
+        z = _normalize_z(z, self._z_mean, self._z_scale)
         parts = [emb(w_disc[:, i]) for i, emb in enumerate(self.embeddings)]
-        parts += [p for p in (x, z) if p.shape[1] > 0]
+        if self.condition_on_x and x.shape[1] > 0:
+            parts.append(x)
+        parts += [z] if z.shape[1] > 0 else []
         return torch.cat(parts, dim=1)
 
     def _params(self, w_disc, x, z):

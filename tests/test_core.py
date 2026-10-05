@@ -1,15 +1,32 @@
 import unittest
 
 import numpy as np
+import pandas as pd
 import torch
 
+from data.adult import (
+    VOCAB_ADULT, _OCCUPATION_CODES, _bucket_education, _bucket_hours,
+)
+from data.german import (
+    PURPOSE_COLUMNS,
+    SFM_CONFIG_GERMAN,
+    VOCAB_GERMAN,
+    _CHECKING_CODES,
+    _FEMALE_PERSONAL_STATUS_CODES,
+    _HOUSING_CODES,
+    _PURPOSE_CODES,
+    _SAVINGS_CODES,
+)
 from evaluation.recourse_metrics import (
     add_candidate_geometry,
     add_sampled_candidate_geometry,
     attach_mediated_disparities,
     select_best,
+    select_distribution_constrained,
+    select_validity_constrained,
 )
 from evaluation.compute_recourse import _bootstrap_absolute_closure
+from evaluation.ablate_recourse import compute_constraint_diagnostics
 from evaluation.synthetic_validation import run as run_synthetic
 from flows.interventions import sample_intervention_batch
 from flows.models import (
@@ -18,6 +35,7 @@ from flows.models import (
     DiscreteMediator,
 )
 from flows.schema import MediatorSchema
+from flows.posterior_predictive import mediator_posterior_predictive
 
 
 class _DeterministicDiscrete:
@@ -55,6 +73,21 @@ class _TransientSplineFailure(torch.nn.Module):
             raise AssertionError("simulated float32 inverse roundoff")
         return torch.zeros(context.shape[0], n, 1)
 
+class _EmptyDiscrete(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.anchor = torch.nn.Parameter(torch.zeros(1))
+
+    def sample(self, x, z):
+        del z
+        return torch.empty(len(x), 0, dtype=torch.long, device=x.device)
+
+
+class _ContextContinuous:
+    def sample(self, n, w_disc, x, z):
+        del n, w_disc, x
+        return z[:, :2]
+
 
 class RecourseObjectiveTests(unittest.TestCase):
     def test_closure_uses_absolute_disparity_and_penalizes_overshoot(self):
@@ -91,6 +124,71 @@ class RecourseObjectiveTests(unittest.TestCase):
         self.assertAlmostEqual(
             record["post_recourse_mediated_prediction_disparity"], -0.1
         )
+
+    def test_distribution_constraint_selects_minimum_cost_feasible_plan(self):
+        candidates = [
+            {"cost": 0.0, "success_probability_xi": 0.2,
+             "outcome_wasserstein": 0.02},
+            {"cost": 0.4, "success_probability_xi": 0.9,
+             "outcome_wasserstein": 0.08},
+            {"cost": 0.7, "success_probability_xi": 1.0,
+             "outcome_wasserstein": 0.04},
+        ]
+        selected = select_distribution_constrained(candidates, 0.8, 0.1)
+        self.assertEqual(selected["cost"], 0.4)
+        self.assertTrue(selected["constraint_feasible"])
+        self.assertFalse(selected["constraint_abstained"])
+
+    def test_validity_only_baseline_uses_the_same_chance_constraint(self):
+        candidates = [
+            {"cost": 0.0, "success_probability_xi": 0.2},
+            {"cost": 0.4, "success_probability_xi": 0.9},
+            {"cost": 0.7, "success_probability_xi": 1.0},
+        ]
+        selected = select_validity_constrained(candidates, 0.8)
+        self.assertEqual(selected["cost"], 0.4)
+        self.assertTrue(selected["constraint_feasible"])
+
+    def test_constraint_diagnostics_separate_reference_compatibility(self):
+        candidates = [
+            [
+                {"success_probability_xi": 0.9, "outcome_wasserstein": 0.04},
+                {"success_probability_xi": 0.2, "outcome_wasserstein": 0.01},
+            ],
+            [
+                {"success_probability_xi": 1.0, "outcome_wasserstein": 0.20},
+            ],
+        ]
+        diagnostics = compute_constraint_diagnostics(
+            candidates,
+            np.asarray([[0.6, 0.7], [0.1, 0.2]]),
+            threshold=0.5,
+            min_success_probability=0.8,
+            epsilon_grid=[0.1, 0.3],
+        )
+        self.assertEqual(diagnostics["reference_validity_rate"], 0.5)
+        self.assertEqual(diagnostics["validity_only_coverage"], 1.0)
+        self.assertAlmostEqual(
+            diagnostics[
+                "minimum_attainable_w1_among_valid_actions"]["median"],
+            0.12,
+        )
+        at_point_one = diagnostics["coverage_vs_epsilon"][0]
+        self.assertEqual(at_point_one["coverage"], 0.5)
+        self.assertEqual(at_point_one["coverage_reference_valid"], 1.0)
+        self.assertEqual(at_point_one["coverage_reference_invalid"], 0.0)
+
+    def test_distribution_constraint_abstains_with_factual_plan(self):
+        candidates = [
+            {"cost": 0.0, "success_probability_xi": 0.2,
+             "outcome_wasserstein": 0.02},
+            {"cost": 0.4, "success_probability_xi": 0.9,
+             "outcome_wasserstein": 0.2},
+        ]
+        selected = select_distribution_constrained(candidates, 0.8, 0.1)
+        self.assertEqual(selected["cost"], 0.0)
+        self.assertFalse(selected["constraint_feasible"])
+        self.assertTrue(selected["constraint_abstained"])
 
     def test_post_prediction_is_observed_group_for_disadvantaged_code_one(self):
         record = {"p_xi": 0.7, "p_xcf": 0.2}
@@ -145,6 +243,14 @@ class MediationTests(unittest.TestCase):
         sample = model.sample(x, z)
         self.assertEqual(tuple(sample.shape), (5, 2))
         self.assertEqual(tuple(model.log_prob(sample, x, z).shape), (5,))
+
+    def test_mediator_context_standardizes_only_configured_confounder(self):
+        model = DiscreteMediator(
+            1, 2, {"a": 2}, hidden_dim=8, n_layers=1,
+            z_mean=[40.0, 0.0], z_scale=[10.0, 1.0],
+        )
+        context = model._cond(torch.tensor([[1.0]]), torch.tensor([[50.0, 1.0]]))
+        torch.testing.assert_close(context, torch.tensor([[1.0, 1.0, 1.0]]))
 
     def test_conditional_gaussian_baseline_shapes(self):
         model = ConditionalGaussian(1, 1, 1, {"a": 3}, hidden_features=8)
@@ -206,6 +312,94 @@ class MediationTests(unittest.TestCase):
         population = sample_intervention_batch(**common, same_level="resample_marginal")
         self.assertTrue(torch.equal(individual.w_cont, torch.tensor([[0.9, -0.7]])))
         self.assertTrue(torch.equal(population.w_cont, torch.tensor([[0.9, 2.5]])))
+
+    def test_same_level_discrete_block_uses_statistical_factorization_only(self):
+        schema = MediatorSchema.build(
+            [["checking", "savings", "housing"], ["amount", "duration"]],
+            ["checking", "savings", "housing"], ["amount", "duration"],
+        )
+        model = DiscreteMediator(
+            1, 1, {"checking": 4, "savings": 5, "housing": 3},
+            autoregressive=True, layers=schema.discrete_layers,
+            within_block_autoregressive=True,
+        )
+        self.assertEqual(model.parent_indices, [[], [0], [0, 1]])
+        self.assertEqual(schema.descendants_of({"checking"}), {"amount", "duration"})
+
+    def test_continuous_mechanism_can_exclude_sensitive_attribute(self):
+        model = ConditionalGaussian(
+            2, 1, 1, {"status": 3}, hidden_features=8,
+            condition_on_x=False,
+        )
+        wd = torch.tensor([[1], [1]])
+        z = torch.tensor([[0.5], [0.5]])
+        context = model._context(wd, torch.tensor([[0.0], [1.0]]), z)
+        torch.testing.assert_close(context[0], context[1])
+
+    def test_continuous_posterior_predictive_uses_fixed_contexts(self):
+        x = torch.tensor([[0.0], [0.0], [1.0], [1.0]])
+        z = torch.tensor([
+            [1.0, 2.0], [2.0, 4.0], [3.0, 6.0], [4.0, 8.0],
+        ])
+        diagnostics = mediator_posterior_predictive(
+            _EmptyDiscrete(), _ContextContinuous(), x, z,
+            torch.empty(4, 0, dtype=torch.long), z.clone(), {},
+            ["hours", "weeks"], samples_per_context=1, max_rows=4,
+            min_group_rows=2, seed=3,
+        )
+
+        self.assertLess(diagnostics["max_overall_continuous_w1"], 0.1)
+        self.assertLess(diagnostics["max_group_continuous_w1"], 0.1)
+        self.assertLess(
+            diagnostics["max_continuous_correlation_error"], 1e-6
+        )
+
+class AdultDataTests(unittest.TestCase):
+    def test_education_bucketing_matches_acs_six_level_structure(self):
+        values = pd.Series([1, 8, 9, 10, 12, 13, 14, 15, 16])
+        actual = _bucket_education(values).tolist()
+        self.assertEqual(actual, [0, 0, 1, 2, 2, 3, 4, 5, 5])
+
+    def test_hours_binning_is_ordered_and_isolates_forty_hours(self):
+        values = pd.Series(
+            [1, 19, 20, 29, 30, 34, 35, 39, 40, 41, 49, 50, 59, 60, 99]
+        )
+        expected = [0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7]
+        self.assertEqual(_bucket_hours(values).tolist(), expected)
+
+    def test_occupation_encoding_is_complete_and_contiguous(self):
+        self.assertEqual(len(_OCCUPATION_CODES), 14)
+        self.assertEqual(sorted(_OCCUPATION_CODES.values()), list(range(14)))
+        self.assertEqual(VOCAB_ADULT["OCCUPATION_GRP"], 14)
+        self.assertEqual(VOCAB_ADULT["HOURS_GRP"], 8)
+
+
+class GermanCreditDataTests(unittest.TestCase):
+    def test_sensitive_sex_codes_match_uci_documentation(self):
+        self.assertEqual(_FEMALE_PERSONAL_STATUS_CODES, {"A92", "A95"})
+
+    def test_mediator_encodings_are_complete_and_contiguous(self):
+        for mapping, size in (
+            (_SAVINGS_CODES, 5),
+            (_CHECKING_CODES, 4),
+            (_HOUSING_CODES, 3),
+            (_PURPOSE_CODES, 10),
+        ):
+            self.assertEqual(sorted(mapping.values()), list(range(size)))
+        self.assertEqual(VOCAB_GERMAN, {
+            "CHECKING_GRP": 4,
+            "SAVINGS_GRP": 5,
+            "HOUSING_GRP": 3,
+        })
+
+    def test_acsr_roles_include_purpose_and_repayment_terms(self):
+        self.assertEqual(len(PURPOSE_COLUMNS), 10)
+        self.assertEqual(
+            SFM_CONFIG_GERMAN["confounders"], ["AGE", *PURPOSE_COLUMNS]
+        )
+        self.assertEqual(
+            SFM_CONFIG_GERMAN["mediators_cont"], ["CREDIT_AMOUNT", "DURATION"]
+        )
 
 
 if __name__ == "__main__":

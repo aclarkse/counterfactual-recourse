@@ -54,12 +54,6 @@ class MediatorSchema:
             )
         if continuous_layers and continuous_layers[0] != len(layers) - 1:
             raise ValueError("The joint continuous block must be the final block.")
-        for block in layers:
-            if block and kind[block[0]] == "discrete" and len(block) > 1:
-                raise ValueError(
-                    "Same-level categorical mediators require a joint categorical "
-                    "model; only singleton categorical blocks are supported."
-                )
         discrete_layer_indices = [
             next(i for i, block in enumerate(layers) if name in block)
             for name in discrete_names
