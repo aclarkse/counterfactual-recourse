@@ -1,0 +1,13 @@
+Outcome-scale truth P(Y=1): nde=+0.0417  nie=+0.3134  te=+0.3339
+Logistic Reg.
+  NDE: flow=+0.0352  oracle=+0.0352  flow-oracle=+0.0000
+  NIE: flow=+0.3168  oracle=+0.3144  flow-oracle=+0.0024
+   TE: flow=+0.3337  oracle=+0.3312  flow-oracle=+0.0025
+MLP (64--32)
+  NDE: flow=+0.0811  oracle=+0.0809  flow-oracle=+0.0002
+  NIE: flow=+0.2757  oracle=+0.2740  flow-oracle=+0.0017
+   TE: flow=+0.3178  oracle=+0.3152  flow-oracle=+0.0025
+Random Forest
+  NDE: flow=+0.0515  oracle=+0.0515  flow-oracle=-0.0000
+  NIE: flow=+0.3056  oracle=+0.3038  flow-oracle=+0.0018
+   TE: flow=+0.3233  oracle=+0.3215  flow-oracle=+0.0019

@@ -62,6 +62,25 @@ class GermanSyntheticSCMTests(unittest.TestCase):
             ["EDUCATION", "JOB", "SAVINGS_GRP"]].mean()
         self.assertTrue(np.all(means.loc[1] > means.loc[0]))
 
+    def test_unit_mediation_scale_is_the_default(self):
+        scaled = sample_german_synthetic(20000, seed=0, mediation_scale=1.0)
+        self.assertTrue(self.df.equals(scaled))
+
+    def test_mediation_scale_controls_indirect_effect_only(self):
+        effects = [oracle_mediation_effects(n_samples=100_000, seed=1,
+                                            mediation_scale=scale)
+                   for scale in (0.0, 0.5, 1.0, 2.0)]
+        self.assertLess(abs(effects[0]["nie"]), 0.01)
+        nies = [e["nie"] for e in effects]
+        self.assertTrue(all(a < b for a, b in zip(nies, nies[1:])))
+        for e in effects[1:]:
+            self.assertAlmostEqual(e["nde"], effects[0]["nde"], places=3)
+
+    def test_zero_mediation_scale_removes_sex_mediator_shift(self):
+        df = sample_german_synthetic(50000, seed=0, mediation_scale=0.0)
+        means = df.groupby("SEX")[["EDUCATION", "JOB", "SAVINGS_GRP"]].mean()
+        self.assertTrue(np.all(np.abs(means.loc[1] - means.loc[0]) < 0.03))
+
     def test_oracle_sample_fn_matches_flow_sampler_interface(self):
         import torch
         from sklearn.preprocessing import QuantileTransformer

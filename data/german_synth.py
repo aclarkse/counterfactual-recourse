@@ -77,9 +77,14 @@ def _age_std(age):
     return (np.asarray(age, dtype=float) - _AGE_CENTER) / _AGE_SCALE
 
 
-def sample_mediators(sex, age, rng):
-    """Draw (EDUCATION, JOB, SAVINGS_GRP, CREDIT_AMOUNT, DURATION)."""
-    sex = np.asarray(sex, dtype=float)
+def sample_mediators(sex, age, rng, mediation_scale=1.0):
+    """Draw (EDUCATION, JOB, SAVINGS_GRP, CREDIT_AMOUNT, DURATION).
+
+    ``mediation_scale`` multiplies every SEX -> mediator coefficient, so it
+    scales the indirect effect while leaving the female mediator law, and
+    hence the direct effect, unchanged.
+    """
+    sex = np.asarray(sex, dtype=float) * float(mediation_scale)
     a = _age_std(age)
     edu = _ordered_logit(_EDU["sex"] * sex + _EDU["age"] * a, _EDU_CUTS, rng)
     job = _ordered_logit(
@@ -124,11 +129,12 @@ def sample_age(n, rng):
     return np.clip(19.0 + rng.gamma(3.0, 6.0, size=n), 19.0, 75.0)
 
 
-def sample_german_synthetic(n_samples, seed=0, p_male=0.5):
+def sample_german_synthetic(n_samples, seed=0, p_male=0.5, mediation_scale=1.0):
     rng = np.random.default_rng(seed)
     sex = (rng.random(n_samples) < p_male).astype(int)
     age = sample_age(n_samples, rng)
-    edu, job, sav, amount, duration = sample_mediators(sex, age, rng)
+    edu, job, sav, amount, duration = sample_mediators(
+        sex, age, rng, mediation_scale)
     p_good = good_credit_probability(sex, age, edu, job, sav, amount, duration)
     good = (rng.random(n_samples) < p_good).astype(int)
     return pd.DataFrame({
@@ -147,10 +153,14 @@ def load_german_synthetic(
     n_samples: int = 10000,
     data_seed: int = 0,
     p_male: float = 0.5,
+    mediation_scale: float = 1.0,
 ) -> pd.DataFrame:
     """Draw a fixed synthetic population; the experiment seed only splits it."""
-    df = sample_german_synthetic(n_samples, seed=data_seed, p_male=p_male)
-    effects = oracle_mediation_effects(n_samples=200_000, seed=data_seed + 1)
+    df = sample_german_synthetic(n_samples, seed=data_seed, p_male=p_male,
+                                 mediation_scale=mediation_scale)
+    effects = oracle_mediation_effects(n_samples=200_000, seed=data_seed + 1,
+                                       mediation_scale=mediation_scale)
+    print(f"Mediation scale: {mediation_scale:g}")
     print(f"Final rows : {len(df):,}")
     print(f"Good-credit rate: {df['GOOD_CREDIT'].mean():.3f}")
     print(f"Female share: {(df['SEX'] == 0).mean():.3f}")
@@ -161,7 +171,8 @@ def load_german_synthetic(
     return df
 
 
-def oracle_mediation_effects(n_samples=200_000, seed=1, ages=None):
+def oracle_mediation_effects(n_samples=200_000, seed=1, ages=None,
+                             mediation_scale=1.0):
     """True pure NDE/NIE/TE of SEX (0 -> 1) on P(GOOD_CREDIT=1).
 
     ``mu_ab = E_AGE E[P(Y=1 | SEX=a, W) | W ~ W(SEX=b, AGE)]``, with the
@@ -171,8 +182,8 @@ def oracle_mediation_effects(n_samples=200_000, seed=1, ages=None):
     age = sample_age(n_samples, rng) if ages is None else np.asarray(ages)
     n = len(age)
     zeros, ones = np.zeros(n), np.ones(n)
-    w0 = sample_mediators(zeros, age, rng)
-    w1 = sample_mediators(ones, age, rng)
+    w0 = sample_mediators(zeros, age, rng, mediation_scale)
+    w1 = sample_mediators(ones, age, rng, mediation_scale)
     mu = {
         "mu00": good_credit_probability(zeros, age, *w0).mean(),
         "mu10": good_credit_probability(ones, age, *w0).mean(),
@@ -187,7 +198,7 @@ def oracle_mediation_effects(n_samples=200_000, seed=1, ages=None):
     return mu
 
 
-def make_oracle_sample_fn(scaler, seed=0):
+def make_oracle_sample_fn(scaler, seed=0, mediation_scale=1.0):
     """True-SCM drop-in for ``flows.diagnostics.make_sample_fns``' sampler.
 
     ``z`` holds raw AGE, as in the cached tensors. Continuous draws are mapped
@@ -201,7 +212,7 @@ def make_oracle_sample_fn(scaler, seed=0):
         x_rep = x.cpu().repeat_interleave(K, dim=0)
         z_rep = z.cpu().repeat_interleave(K, dim=0)
         edu, job, sav, amount, duration = sample_mediators(
-            x_rep[:, 0].numpy(), z_rep[:, 0].numpy(), rng
+            x_rep[:, 0].numpy(), z_rep[:, 0].numpy(), rng, mediation_scale
         )
         w_cont_orig = np.column_stack([amount, duration]).astype(np.float32)
         w_cont = (scaler.transform(w_cont_orig).astype(np.float32)
@@ -218,6 +229,50 @@ def make_oracle_sample_fn(scaler, seed=0):
     return sample_fn
 
 
+def describe_dgp(mediation_scale=1.0, n_samples=10_000, data_seed=0,
+                 p_male=0.5, oracle_samples=200_000):
+    """Record the full data-generating process of one benchmark version."""
+    k = float(mediation_scale)
+    df = sample_german_synthetic(n_samples, seed=data_seed, p_male=p_male,
+                                 mediation_scale=k)
+    effects = oracle_mediation_effects(oracle_samples, seed=data_seed + 1,
+                                       mediation_scale=k)
+    return {
+        "mediation_scale": k,
+        "population": {"n_samples": int(n_samples), "data_seed": int(data_seed),
+                       "p_male": float(p_male),
+                       "age": "19 + Gamma(shape=3, scale=6), clipped to [19, 75]",
+                       "age_standardization": [_AGE_CENTER, _AGE_SCALE]},
+        "education": {"sex": k * _EDU["sex"], "age": _EDU["age"],
+                      "cutpoints": _EDU_CUTS.tolist(), "link": "ordered logit"},
+        "job": {"sex": k * _JOB["sex"], "age": _JOB["age"], "edu": _JOB["edu"],
+                "cutpoints": _JOB_CUTS.tolist(), "link": "ordered logit"},
+        "savings": {"sex": k * _SAV["sex"], "age": _SAV["age"],
+                    "job": _SAV["job"], "cutpoints": _SAV_CUTS.tolist(),
+                    "link": "ordered logit"},
+        "log_credit_amount": dict(_AMOUNT),
+        "log_duration": dict(_DURATION),
+        "amount_duration_noise_correlation": _RHO_LD,
+        "clip_ranges": {"credit_amount": list(AMOUNT_RANGE),
+                        "duration": list(DURATION_RANGE)},
+        "outcome_logit": dict(_Y),
+        "outcome_standardization": {
+            "log_amount": [_LOG_AMOUNT_CENTER, _LOG_AMOUNT_SCALE],
+            "log_duration": [_LOG_DURATION_CENTER, _LOG_DURATION_SCALE],
+            "ordinal_centering": 1.5},
+        "realized": {
+            "good_credit_rate": float(df["GOOD_CREDIT"].mean()),
+            "female_share": float((df["SEX"] == 0).mean()),
+            "mediator_means_by_sex": {
+                str(sex): {name: float(value) for name, value in row.items()}
+                for sex, row in df.groupby("SEX")[
+                    ["EDUCATION", "JOB", "SAVINGS_GRP"]].mean().iterrows()},
+        },
+        "oracle_effects_p_y1": {key: float(effects[key])
+                                for key in ("nde", "nie", "te", "interaction")},
+    }
+
+
 SFM_CONFIG_GERMAN_SYNTH = {
     "sensitive": ["SEX"],
     "confounders": ["AGE"],
@@ -229,3 +284,34 @@ SFM_CONFIG_GERMAN_SYNTH = {
 VOCAB_GERMAN_SYNTH = {"EDUCATION": 4, "JOB": 4, "SAVINGS_GRP": 4}
 
 GROUP_LABELS_GERMAN_SYNTH = {0: "Female", 1: "Male"}
+
+
+STRESS_TEST_VERSIONS = {
+    "german_synth_m0": 0.0,
+    "german_synth_m05": 0.5,
+    "german_synth": 1.0,
+    "german_synth_m2": 2.0,
+}
+
+
+def write_dgp_record(json_path="outputs/german_synth_dgp_versions.json"):
+    """Write the data-generating process of every stress-test version."""
+    import json
+    import os
+
+    record = {name: describe_dgp(scale)
+              for name, scale in STRESS_TEST_VERSIONS.items()}
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    with open(json_path, "w", encoding="utf-8") as file:
+        json.dump(record, file, indent=2)
+    for name, item in record.items():
+        effects = item["oracle_effects_p_y1"]
+        print(f"{name:18s} kappa={item['mediation_scale']:<4g} "
+              f"NDE={effects['nde']:+.4f} NIE={effects['nie']:+.4f} "
+              f"TE={effects['te']:+.4f} "
+              f"P(Y=1)={item['realized']['good_credit_rate']:.3f}")
+    return record
+
+
+if __name__ == "__main__":
+    write_dgp_record()

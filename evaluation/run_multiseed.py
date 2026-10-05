@@ -36,6 +36,9 @@ DATASET_MODELS = {
     "bar": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "german": ("Logistic Reg.", "Random Forest"),
     "german_synth": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
+    "german_synth_m0": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
+    "german_synth_m05": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
+    "german_synth_m2": ("Logistic Reg.", "MLP (64--32)", "Random Forest"),
     "oulad": ("Logistic Reg.", "MLP (64--32)"),
 }
 DATASET_FLOW_ARTIFACT = {
@@ -43,6 +46,9 @@ DATASET_FLOW_ARTIFACT = {
     "adult": ("adult_ordered_hours_ppc_v1", ["AGE"]),
     "german": ("german_credit_acsr_all_s_paths_v2", ["AGE"]),
     "german_synth": ("german_synth_scm_v1", ["AGE"]),
+    "german_synth_m0": ("german_synth_scm_v1_m0", ["AGE"]),
+    "german_synth_m05": ("german_synth_scm_v1_m05", ["AGE"]),
+    "german_synth_m2": ("german_synth_scm_v1_m2", ["AGE"]),
     "oulad": ("oulad_disability_day60_engagement_v1",
               ["AGE_MIDPOINT", "IMD_MIDPOINT", "NUM_PREV_ATTEMPTS",
                "STUDIED_CREDITS"]),
@@ -172,7 +178,8 @@ def _recourse_artifacts_complete(paths: list[Path], dataset: str) -> bool:
     if not all(path.exists() for path in paths):
         return False
     min_success = _configured_min_success_probability(dataset)
-    if dataset not in {"acs", "adult", "bar", "german", "german_synth", "oulad"}:
+    if dataset not in {"acs", "adult", "bar", "german", "oulad"} | {
+            name for name in DATASET_MODELS if name.startswith("german_synth")}:
         return True
     try:
         expected_versions = (
@@ -651,7 +658,7 @@ def write_gamma_summary(summary: dict, output_dir: Path) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--datasets", nargs="+", choices=("bar", "acs", "adult", "german", "german_synth", "oulad"),
+        "--datasets", nargs="+", choices=tuple(DATASET_MODELS),
         default=["bar", "acs", "adult", "german"])
     parser.add_argument("--seeds", nargs="+", type=int,
                         default=[42, 43, 44, 45, 46])

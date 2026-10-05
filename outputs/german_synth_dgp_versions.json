@@ -1,0 +1,458 @@
+{
+  "german_synth_m0": {
+    "mediation_scale": 0.0,
+    "population": {
+      "n_samples": 10000,
+      "data_seed": 0,
+      "p_male": 0.5,
+      "age": "19 + Gamma(shape=3, scale=6), clipped to [19, 75]",
+      "age_standardization": [
+        35.0,
+        11.0
+      ]
+    },
+    "education": {
+      "sex": 0.0,
+      "age": 0.3,
+      "cutpoints": [
+        -1.0,
+        0.6,
+        2.2
+      ],
+      "link": "ordered logit"
+    },
+    "job": {
+      "sex": 0.0,
+      "age": 0.3,
+      "edu": 1.0,
+      "cutpoints": [
+        -0.5,
+        1.4,
+        3.4
+      ],
+      "link": "ordered logit"
+    },
+    "savings": {
+      "sex": 0.0,
+      "age": 0.5,
+      "job": 0.7,
+      "cutpoints": [
+        0.3,
+        1.8,
+        3.0
+      ],
+      "link": "ordered logit"
+    },
+    "log_credit_amount": {
+      "intercept": 7.7,
+      "age": 0.1,
+      "job": 0.1,
+      "sav": -0.1,
+      "noise": 0.7
+    },
+    "log_duration": {
+      "intercept": 3.35,
+      "age": -0.05,
+      "job": -0.15,
+      "sav": -0.12,
+      "noise": 0.4
+    },
+    "amount_duration_noise_correlation": 0.8,
+    "clip_ranges": {
+      "credit_amount": [
+        250.0,
+        18424.0
+      ],
+      "duration": [
+        4.0,
+        72.0
+      ]
+    },
+    "outcome_logit": {
+      "intercept": 0.85,
+      "sex": 0.3,
+      "age": 0.3,
+      "edu": 0.2,
+      "job": 0.6,
+      "sav": 0.6,
+      "amount": -0.7,
+      "duration": -0.8,
+      "sav_x_amount": 0.25
+    },
+    "outcome_standardization": {
+      "log_amount": [
+        7.75,
+        0.75
+      ],
+      "log_duration": [
+        2.9,
+        0.45
+      ],
+      "ordinal_centering": 1.5
+    },
+    "realized": {
+      "good_credit_rate": 0.5787,
+      "female_share": 0.501,
+      "mediator_means_by_sex": {
+        "0": {
+          "EDUCATION": 1.2165668662674651,
+          "JOB": 1.4111776447105788,
+          "SAVINGS_GRP": 1.1532934131736527
+        },
+        "1": {
+          "EDUCATION": 1.228256513026052,
+          "JOB": 1.438677354709419,
+          "SAVINGS_GRP": 1.1667334669338678
+        }
+      }
+    },
+    "oracle_effects_p_y1": {
+      "nde": 0.04181010553677256,
+      "nie": -0.0006146694010827902,
+      "te": 0.041292688201224226,
+      "interaction": 9.725206553445886e-05
+    }
+  },
+  "german_synth_m05": {
+    "mediation_scale": 0.5,
+    "population": {
+      "n_samples": 10000,
+      "data_seed": 0,
+      "p_male": 0.5,
+      "age": "19 + Gamma(shape=3, scale=6), clipped to [19, 75]",
+      "age_standardization": [
+        35.0,
+        11.0
+      ]
+    },
+    "education": {
+      "sex": 0.6,
+      "age": 0.3,
+      "cutpoints": [
+        -1.0,
+        0.6,
+        2.2
+      ],
+      "link": "ordered logit"
+    },
+    "job": {
+      "sex": 0.5,
+      "age": 0.3,
+      "edu": 1.0,
+      "cutpoints": [
+        -0.5,
+        1.4,
+        3.4
+      ],
+      "link": "ordered logit"
+    },
+    "savings": {
+      "sex": 0.45,
+      "age": 0.5,
+      "job": 0.7,
+      "cutpoints": [
+        0.3,
+        1.8,
+        3.0
+      ],
+      "link": "ordered logit"
+    },
+    "log_credit_amount": {
+      "intercept": 7.7,
+      "age": 0.1,
+      "job": 0.1,
+      "sav": -0.1,
+      "noise": 0.7
+    },
+    "log_duration": {
+      "intercept": 3.35,
+      "age": -0.05,
+      "job": -0.15,
+      "sav": -0.12,
+      "noise": 0.4
+    },
+    "amount_duration_noise_correlation": 0.8,
+    "clip_ranges": {
+      "credit_amount": [
+        250.0,
+        18424.0
+      ],
+      "duration": [
+        4.0,
+        72.0
+      ]
+    },
+    "outcome_logit": {
+      "intercept": 0.85,
+      "sex": 0.3,
+      "age": 0.3,
+      "edu": 0.2,
+      "job": 0.6,
+      "sav": 0.6,
+      "amount": -0.7,
+      "duration": -0.8,
+      "sav_x_amount": 0.25
+    },
+    "outcome_standardization": {
+      "log_amount": [
+        7.75,
+        0.75
+      ],
+      "log_duration": [
+        2.9,
+        0.45
+      ],
+      "ordinal_centering": 1.5
+    },
+    "realized": {
+      "good_credit_rate": 0.6265,
+      "female_share": 0.501,
+      "mediator_means_by_sex": {
+        "0": {
+          "EDUCATION": 1.2165668662674651,
+          "JOB": 1.4111776447105788,
+          "SAVINGS_GRP": 1.1532934131736527
+        },
+        "1": {
+          "EDUCATION": 1.5380761523046091,
+          "JOB": 1.8002004008016033,
+          "SAVINGS_GRP": 1.5366733466933868
+        }
+      }
+    },
+    "oracle_effects_p_y1": {
+      "nde": 0.04181010553677256,
+      "nie": 0.09840940766125983,
+      "te": 0.13627867413949368,
+      "interaction": -0.003940839058538703
+    }
+  },
+  "german_synth": {
+    "mediation_scale": 1.0,
+    "population": {
+      "n_samples": 10000,
+      "data_seed": 0,
+      "p_male": 0.5,
+      "age": "19 + Gamma(shape=3, scale=6), clipped to [19, 75]",
+      "age_standardization": [
+        35.0,
+        11.0
+      ]
+    },
+    "education": {
+      "sex": 1.2,
+      "age": 0.3,
+      "cutpoints": [
+        -1.0,
+        0.6,
+        2.2
+      ],
+      "link": "ordered logit"
+    },
+    "job": {
+      "sex": 1.0,
+      "age": 0.3,
+      "edu": 1.0,
+      "cutpoints": [
+        -0.5,
+        1.4,
+        3.4
+      ],
+      "link": "ordered logit"
+    },
+    "savings": {
+      "sex": 0.9,
+      "age": 0.5,
+      "job": 0.7,
+      "cutpoints": [
+        0.3,
+        1.8,
+        3.0
+      ],
+      "link": "ordered logit"
+    },
+    "log_credit_amount": {
+      "intercept": 7.7,
+      "age": 0.1,
+      "job": 0.1,
+      "sav": -0.1,
+      "noise": 0.7
+    },
+    "log_duration": {
+      "intercept": 3.35,
+      "age": -0.05,
+      "job": -0.15,
+      "sav": -0.12,
+      "noise": 0.4
+    },
+    "amount_duration_noise_correlation": 0.8,
+    "clip_ranges": {
+      "credit_amount": [
+        250.0,
+        18424.0
+      ],
+      "duration": [
+        4.0,
+        72.0
+      ]
+    },
+    "outcome_logit": {
+      "intercept": 0.85,
+      "sex": 0.3,
+      "age": 0.3,
+      "edu": 0.2,
+      "job": 0.6,
+      "sav": 0.6,
+      "amount": -0.7,
+      "duration": -0.8,
+      "sav_x_amount": 0.25
+    },
+    "outcome_standardization": {
+      "log_amount": [
+        7.75,
+        0.75
+      ],
+      "log_duration": [
+        2.9,
+        0.45
+      ],
+      "ordinal_centering": 1.5
+    },
+    "realized": {
+      "good_credit_rate": 0.668,
+      "female_share": 0.501,
+      "mediator_means_by_sex": {
+        "0": {
+          "EDUCATION": 1.2165668662674651,
+          "JOB": 1.4111776447105788,
+          "SAVINGS_GRP": 1.1532934131736527
+        },
+        "1": {
+          "EDUCATION": 1.8484969939879758,
+          "JOB": 2.1362725450901805,
+          "SAVINGS_GRP": 1.908817635270541
+        }
+      }
+    },
+    "oracle_effects_p_y1": {
+      "nde": 0.04181010553677256,
+      "nie": 0.18840946482964815,
+      "te": 0.22055984045144994,
+      "interaction": -0.009659729914970772
+    }
+  },
+  "german_synth_m2": {
+    "mediation_scale": 2.0,
+    "population": {
+      "n_samples": 10000,
+      "data_seed": 0,
+      "p_male": 0.5,
+      "age": "19 + Gamma(shape=3, scale=6), clipped to [19, 75]",
+      "age_standardization": [
+        35.0,
+        11.0
+      ]
+    },
+    "education": {
+      "sex": 2.4,
+      "age": 0.3,
+      "cutpoints": [
+        -1.0,
+        0.6,
+        2.2
+      ],
+      "link": "ordered logit"
+    },
+    "job": {
+      "sex": 2.0,
+      "age": 0.3,
+      "edu": 1.0,
+      "cutpoints": [
+        -0.5,
+        1.4,
+        3.4
+      ],
+      "link": "ordered logit"
+    },
+    "savings": {
+      "sex": 1.8,
+      "age": 0.5,
+      "job": 0.7,
+      "cutpoints": [
+        0.3,
+        1.8,
+        3.0
+      ],
+      "link": "ordered logit"
+    },
+    "log_credit_amount": {
+      "intercept": 7.7,
+      "age": 0.1,
+      "job": 0.1,
+      "sav": -0.1,
+      "noise": 0.7
+    },
+    "log_duration": {
+      "intercept": 3.35,
+      "age": -0.05,
+      "job": -0.15,
+      "sav": -0.12,
+      "noise": 0.4
+    },
+    "amount_duration_noise_correlation": 0.8,
+    "clip_ranges": {
+      "credit_amount": [
+        250.0,
+        18424.0
+      ],
+      "duration": [
+        4.0,
+        72.0
+      ]
+    },
+    "outcome_logit": {
+      "intercept": 0.85,
+      "sex": 0.3,
+      "age": 0.3,
+      "edu": 0.2,
+      "job": 0.6,
+      "sav": 0.6,
+      "amount": -0.7,
+      "duration": -0.8,
+      "sav_x_amount": 0.25
+    },
+    "outcome_standardization": {
+      "log_amount": [
+        7.75,
+        0.75
+      ],
+      "log_duration": [
+        2.9,
+        0.45
+      ],
+      "ordinal_centering": 1.5
+    },
+    "realized": {
+      "good_credit_rate": 0.7278,
+      "female_share": 0.501,
+      "mediator_means_by_sex": {
+        "0": {
+          "EDUCATION": 1.2165668662674651,
+          "JOB": 1.4111776447105788,
+          "SAVINGS_GRP": 1.1532934131736527
+        },
+        "1": {
+          "EDUCATION": 2.402004008016032,
+          "JOB": 2.640681362725451,
+          "SAVINGS_GRP": 2.4821643286573147
+        }
+      }
+    },
+    "oracle_effects_p_y1": {
+      "nde": 0.04181010553677256,
+      "nie": 0.3129158898846247,
+      "te": 0.33348462297406634,
+      "interaction": -0.02124137244733093
+    }
+  }
+}

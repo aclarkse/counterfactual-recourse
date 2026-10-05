@@ -8,6 +8,8 @@ loader:
     n_samples: 10000
     data_seed: 0
     p_male: 0.5
+    # Multiplies every SEX -> mediator coefficient (indirect-effect strength).
+    mediation_scale: 1.0
 
 split:
   test_size: 2000
@@ -96,6 +98,8 @@ gap:
   n_boot: 2000
   # Also score each classifier with true-SCM mediator draws (flow vs oracle).
   oracle_module: data.german_synth
+  oracle_kwargs:
+    mediation_scale: 1.0
 
 recourse:
   # Sampling and subsampling settings match conf/dataset/bar.yaml.
