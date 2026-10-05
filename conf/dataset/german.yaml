@@ -111,6 +111,8 @@ recourse:
     min_success_probability: 0.8
     # Prediction-scale W1 radius around W|X=advantaged,Z_recipient.
     max_outcome_wasserstein: 0.1
+    # Validity levels re-evaluated on the same candidate draws.
+    gamma_sensitivity_grid: [0.5, 0.6, 0.7, 0.8, 0.9]
   n_max: 0
   n_boot: 1000
   sweep_n_max: 0

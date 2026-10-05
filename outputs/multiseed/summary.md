@@ -8,51 +8,51 @@ Seeds: 42, 43, 44, 45, 46. Values are mean ± sample SD across complete refits.
 
 | Method | Post disparity | Recipient L1 closure | Overshoot | Constraint feasible | Cost | Paired absolute-gap gain |
 |---|---:|---:|---:|---:|---:|---:|
-| ordinary actionable recourse | -0.285 ± 0.008 | -35.969 ± 5.656% | 85.360 ± 2.851% | 99.920 ± 0.179% | 0.939 ± 0.105 | 0.000 ± 0.000 |
-| mediation aware recourse | 0.166 ± 0.012 | 11.445 ± 2.376% | 7.200 ± 1.766% | 7.360 ± 1.868% | 0.075 ± 0.029 | 0.101 ± 0.015 |
+| ordinary actionable recourse | -0.209 ± 0.011 | -2.799 ± 6.531% | 81.040 ± 3.354% | 100.000 ± 0.000% | 0.647 ± 0.058 | 0.000 ± 0.000 |
+| mediation aware recourse | 0.105 ± 0.016 | 36.985 ± 4.769% | 17.200 ± 2.117% | 27.520 ± 4.395% | 0.229 ± 0.033 | 0.084 ± 0.018 |
 
 Validation AUC: 0.864 ± 0.001; pure NIE: +0.024 ± 0.015; TE: +0.097 ± 0.014.
 
 Constraint compatibility diagnostics:
 
-Reference-valid: 0.0% ± 0.0%; valid-action coverage: 99.9% ± 0.2%; median minimum attainable W1: 0.214 ± 0.004.
+Reference-valid: 22.4% ± 3.2%; valid-action coverage: 100.0% ± 0.0%; median minimum attainable W1: 0.149 ± 0.009.
 
 | Epsilon | Joint coverage |
 |---:|---:|
 | 0.025 | 0.0% ± 0.0% |
-| 0.050 | 0.0% ± 0.0% |
-| 0.075 | 1.7% ± 1.0% |
-| 0.100 | 7.4% ± 1.9% |
-| 0.150 | 23.4% ± 2.4% |
-| 0.200 | 43.0% ± 1.6% |
-| 0.300 | 77.9% ± 3.4% |
-| 0.400 | 85.5% ± 3.6% |
-| 0.500 | 96.1% ± 2.0% |
+| 0.050 | 5.4% ± 1.4% |
+| 0.075 | 15.1% ± 3.9% |
+| 0.100 | 27.5% ± 4.4% |
+| 0.150 | 50.4% ± 4.4% |
+| 0.200 | 72.7% ± 3.7% |
+| 0.300 | 88.4% ± 4.2% |
+| 0.400 | 99.0% ± 0.8% |
+| 0.500 | 99.9% ± 0.2% |
 
 ### MLP (64--32)
 
 | Method | Post disparity | Recipient L1 closure | Overshoot | Constraint feasible | Cost | Paired absolute-gap gain |
 |---|---:|---:|---:|---:|---:|---:|
-| ordinary actionable recourse | -0.286 ± 0.013 | -33.229 ± 6.396% | 85.520 ± 2.945% | 95.680 ± 2.047% | 1.338 ± 0.131 | 0.000 ± 0.000 |
-| mediation aware recourse | 0.199 ± 0.006 | 1.320 ± 1.751% | 0.800 ± 1.020% | 0.880 ± 1.180% | 0.009 ± 0.010 | 0.075 ± 0.010 |
+| ordinary actionable recourse | -0.202 ± 0.014 | 2.343 ± 4.462% | 80.960 ± 4.201% | 99.120 ± 1.073% | 1.105 ± 0.170 | 0.000 ± 0.000 |
+| mediation aware recourse | 0.109 ± 0.012 | 38.434 ± 5.039% | 16.080 ± 3.230% | 27.600 ± 3.137% | 0.274 ± 0.022 | 0.078 ± 0.010 |
 
 Validation AUC: 0.879 ± 0.001; pure NIE: +0.010 ± 0.012; TE: +0.100 ± 0.011.
 
 Constraint compatibility diagnostics:
 
-Reference-valid: 0.0% ± 0.0%; valid-action coverage: 95.7% ± 2.0%; median minimum attainable W1: 0.248 ± 0.008.
+Reference-valid: 21.6% ± 5.4%; valid-action coverage: 99.1% ± 1.1%; median minimum attainable W1: 0.155 ± 0.005.
 
 | Epsilon | Joint coverage |
 |---:|---:|
 | 0.025 | 0.0% ± 0.0% |
-| 0.050 | 0.0% ± 0.0% |
-| 0.075 | 0.1% ± 0.2% |
-| 0.100 | 0.9% ± 1.2% |
-| 0.150 | 11.8% ± 4.2% |
-| 0.200 | 31.7% ± 3.5% |
-| 0.300 | 72.1% ± 2.5% |
-| 0.400 | 82.0% ± 2.3% |
-| 0.500 | 93.3% ± 2.3% |
+| 0.050 | 2.3% ± 1.2% |
+| 0.075 | 14.3% ± 2.9% |
+| 0.100 | 27.6% ± 3.1% |
+| 0.150 | 47.0% ± 2.7% |
+| 0.200 | 68.7% ± 2.6% |
+| 0.300 | 86.2% ± 3.4% |
+| 0.400 | 96.7% ± 2.6% |
+| 0.500 | 98.6% ± 1.7% |
 
 ## ADULT
 

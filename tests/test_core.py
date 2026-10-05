@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import torch
+from scipy.stats import wasserstein_distance
 
 from data.adult import (
     VOCAB_ADULT, _OCCUPATION_CODES, _bucket_education, _bucket_hours,
@@ -26,7 +27,10 @@ from evaluation.recourse_metrics import (
     select_validity_constrained,
 )
 from evaluation.compute_recourse import _bootstrap_absolute_closure
-from evaluation.ablate_recourse import compute_constraint_diagnostics
+from evaluation.ablate_recourse import (
+    compatibility_threshold,
+    compute_constraint_diagnostics,
+)
 from evaluation.synthetic_validation import run as run_synthetic
 from flows.interventions import sample_intervention_batch
 from flows.models import (
@@ -400,6 +404,30 @@ class GermanCreditDataTests(unittest.TestCase):
         self.assertEqual(
             SFM_CONFIG_GERMAN["mediators_cont"], ["CREDIT_AMOUNT", "DURATION"]
         )
+
+
+
+class CompatibilityThresholdTests(unittest.TestCase):
+    def test_zero_when_reference_is_valid(self):
+        reference = np.array([[0.6, 0.7, 0.8, 0.9]])
+        self.assertEqual(compatibility_threshold(reference, 0.5, 0.75)[0], 0.0)
+
+    def test_closed_form_on_step_quantile(self):
+        # Upper half of the quantile function sits at 0.2 and 0.4; lifting
+        # it to tau = 0.5 costs (0.3 + 0.1) / 4.
+        reference = np.array([[0.0, 0.1, 0.2, 0.4]])
+        self.assertAlmostEqual(
+            compatibility_threshold(reference, 0.5, 0.5)[0], 0.1)
+
+    def test_lower_bounds_every_valid_plan(self):
+        rng = np.random.default_rng(0)
+        reference = rng.beta(2.0, 4.0, size=(1, 200))
+        bound = compatibility_threshold(reference, 0.5, 0.8)[0]
+        for _ in range(100):
+            valid = np.concatenate([rng.uniform(0.5, 1.0, 26),
+                                    rng.uniform(0.0, 1.0, 6)])
+            self.assertGreaterEqual(
+                wasserstein_distance(valid, reference[0]), bound - 1e-12)
 
 
 if __name__ == "__main__":

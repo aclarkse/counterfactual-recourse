@@ -11,20 +11,20 @@
   "same_level_semantics": "preserve_factual",
   "transport_estimand": "independent_coupling_upper_bound",
   "ordinary_actionable_recourse_baseline": {
-    "min_success_probability": 0.8,
+    "min_success_probability": 0.5,
     "lambda_invariance": 0.0,
     "rho_anchor": 0.0,
     "description": "minimum cost subject to the same factual chance-validity constraint and abstention rule as the primary method, without the prediction-Wasserstein constraint"
   },
   "distribution_constrained_recourse": {
-    "min_success_probability": 0.8,
+    "min_success_probability": 0.5,
     "max_outcome_wasserstein": 0.1,
     "comparison_eta": 10.0
   },
   "constraint_diagnostics": {
     "n_recipients": 250,
     "classifier_threshold": 0.5,
-    "min_success_probability": 0.8,
+    "min_success_probability": 0.5,
     "reference_success_probability": {
       "n": 250,
       "mean": 0.32522,
@@ -36,102 +36,121 @@
       "q90": 0.6405,
       "max": 0.715
     },
-    "reference_validity_rate": 0.0,
-    "reference_validity_n": 0,
+    "reference_validity_rate": 0.252,
+    "reference_validity_n": 63,
     "validity_only_coverage": 1.0,
     "validity_only_n": 250,
     "minimum_attainable_w1_among_valid_actions": {
       "n": 250,
-      "mean": 0.2513847845462782,
-      "sd": 0.13899367898325624,
-      "min": 0.06938153443019729,
-      "q25": 0.15631912098543954,
-      "median": 0.21790481885436852,
-      "q75": 0.2970926182205265,
-      "q90": 0.4742413947472577,
-      "max": 0.6366194575025033
+      "mean": 0.1671140720668884,
+      "sd": 0.09934691838643435,
+      "min": 0.029577559107297716,
+      "q25": 0.08957437618324647,
+      "median": 0.14714470449724565,
+      "q75": 0.21513797866833295,
+      "q90": 0.323798768105917,
+      "max": 0.47774779903363734
+    },
+    "compatibility_threshold": {
+      "n": 250,
+      "mean": 0.05643967619574168,
+      "sd": 0.07617239453541684,
+      "min": 0.0,
+      "q25": 4.459947347640995e-05,
+      "median": 0.014496747702360167,
+      "q75": 0.08481431066989906,
+      "q90": 0.20329474357701854,
+      "max": 0.2415612283558587
+    },
+    "bound_violations": 0,
+    "abstention_causes": {
+      "epsilon": 0.1,
+      "no_recourse_rate": 0.0,
+      "target_incompatible_rate": 0.24,
+      "unreachable_rate": 0.452,
+      "feasible_rate": 0.308
     },
     "coverage_vs_epsilon": [
       {
         "epsilon": 0.025,
         "coverage": 0.0,
         "n_feasible": 0,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
+        "coverage_reference_valid": 0.0,
+        "n_reference_valid": 63,
         "coverage_reference_invalid": 0.0,
-        "n_reference_invalid": 250
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.05,
-        "coverage": 0.0,
-        "n_feasible": 0,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
+        "coverage": 0.068,
+        "n_feasible": 17,
+        "coverage_reference_valid": 0.2698412698412698,
+        "n_reference_valid": 63,
         "coverage_reference_invalid": 0.0,
-        "n_reference_invalid": 250
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.075,
-        "coverage": 0.012,
-        "n_feasible": 3,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.012,
-        "n_reference_invalid": 250
+        "coverage": 0.196,
+        "n_feasible": 49,
+        "coverage_reference_valid": 0.7142857142857143,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.0213903743315508,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.1,
-        "coverage": 0.092,
-        "n_feasible": 23,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.092,
-        "n_reference_invalid": 250
+        "coverage": 0.308,
+        "n_feasible": 77,
+        "coverage_reference_valid": 0.9523809523809523,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.09090909090909091,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.15,
-        "coverage": 0.228,
-        "n_feasible": 57,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.228,
-        "n_reference_invalid": 250
+        "coverage": 0.512,
+        "n_feasible": 128,
+        "coverage_reference_valid": 1.0,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.34759358288770054,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.2,
-        "coverage": 0.448,
-        "n_feasible": 112,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.448,
-        "n_reference_invalid": 250
+        "coverage": 0.708,
+        "n_feasible": 177,
+        "coverage_reference_valid": 1.0,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.6096256684491979,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.3,
-        "coverage": 0.752,
-        "n_feasible": 188,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.752,
-        "n_reference_invalid": 250
+        "coverage": 0.844,
+        "n_feasible": 211,
+        "coverage_reference_valid": 1.0,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.7914438502673797,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.4,
-        "coverage": 0.82,
-        "n_feasible": 205,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.82,
-        "n_reference_invalid": 250
+        "coverage": 0.98,
+        "n_feasible": 245,
+        "coverage_reference_valid": 1.0,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 0.9732620320855615,
+        "n_reference_invalid": 187
       },
       {
         "epsilon": 0.5,
-        "coverage": 0.936,
-        "n_feasible": 234,
-        "coverage_reference_valid": null,
-        "n_reference_valid": 0,
-        "coverage_reference_invalid": 0.936,
-        "n_reference_invalid": 250
+        "coverage": 1.0,
+        "n_feasible": 250,
+        "coverage_reference_valid": 1.0,
+        "n_reference_valid": 63,
+        "coverage_reference_invalid": 1.0,
+        "n_reference_invalid": 187
       }
     ]
   },
@@ -147,9 +166,1801 @@
   },
   "reference": "prediction draws under W|X=advantaged,Z_recipient with the recipient's Z held fixed",
   "sweep_association": {
-    "pearson_transport_vs_abs_mediated_post": 0.8966837946976214,
-    "spearman_transport_vs_abs_mediated_post": 0.9153795331267195
+    "pearson_transport_vs_abs_mediated_post": 0.8934355754932382,
+    "spearman_transport_vs_abs_mediated_post": 0.9139597985641263
   },
+  "gamma_sensitivity": [
+    {
+      "min_success_probability": 0.5,
+      "constraint_diagnostics": {
+        "n_recipients": 250,
+        "classifier_threshold": 0.5,
+        "min_success_probability": 0.5,
+        "reference_success_probability": {
+          "n": 250,
+          "mean": 0.32522,
+          "sd": 0.22008498632305493,
+          "min": 0.0,
+          "q25": 0.13125,
+          "median": 0.345,
+          "q75": 0.4975,
+          "q90": 0.6405,
+          "max": 0.715
+        },
+        "reference_validity_rate": 0.252,
+        "reference_validity_n": 63,
+        "validity_only_coverage": 1.0,
+        "validity_only_n": 250,
+        "minimum_attainable_w1_among_valid_actions": {
+          "n": 250,
+          "mean": 0.1671140720668884,
+          "sd": 0.09934691838643435,
+          "min": 0.029577559107297716,
+          "q25": 0.08957437618324647,
+          "median": 0.14714470449724565,
+          "q75": 0.21513797866833295,
+          "q90": 0.323798768105917,
+          "max": 0.47774779903363734
+        },
+        "compatibility_threshold": {
+          "n": 250,
+          "mean": 0.05643967619574168,
+          "sd": 0.07617239453541684,
+          "min": 0.0,
+          "q25": 4.459947347640995e-05,
+          "median": 0.014496747702360167,
+          "q75": 0.08481431066989906,
+          "q90": 0.20329474357701854,
+          "max": 0.2415612283558587
+        },
+        "bound_violations": 0,
+        "abstention_causes": {
+          "epsilon": 0.1,
+          "no_recourse_rate": 0.0,
+          "target_incompatible_rate": 0.24,
+          "unreachable_rate": 0.452,
+          "feasible_rate": 0.308
+        },
+        "coverage_vs_epsilon": [
+          {
+            "epsilon": 0.025,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": 0.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.05,
+            "coverage": 0.068,
+            "n_feasible": 17,
+            "coverage_reference_valid": 0.2698412698412698,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.075,
+            "coverage": 0.196,
+            "n_feasible": 49,
+            "coverage_reference_valid": 0.7142857142857143,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.0213903743315508,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.1,
+            "coverage": 0.308,
+            "n_feasible": 77,
+            "coverage_reference_valid": 0.9523809523809523,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.09090909090909091,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.15,
+            "coverage": 0.512,
+            "n_feasible": 128,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.34759358288770054,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.2,
+            "coverage": 0.708,
+            "n_feasible": 177,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.6096256684491979,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.3,
+            "coverage": 0.844,
+            "n_feasible": 211,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.7914438502673797,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.4,
+            "coverage": 0.98,
+            "n_feasible": 245,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 0.9732620320855615,
+            "n_reference_invalid": 187
+          },
+          {
+            "epsilon": 0.5,
+            "coverage": 1.0,
+            "n_feasible": 250,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 63,
+            "coverage_reference_invalid": 1.0,
+            "n_reference_invalid": 187
+          }
+        ]
+      },
+      "rows": [
+        {
+          "cost": [
+            0.6852851343154908,
+            0.628407107564807,
+            0.74885417098701
+          ],
+          "shortfall": [
+            0.07261988497951406,
+            0.06594893373853991,
+            0.07929146967969082
+          ],
+          "direct_effect": [
+            0.09421808222435343,
+            0.09246136898729244,
+            0.09584817468262453
+          ],
+          "transport": [
+            0.529434883429408,
+            0.5218844610822834,
+            0.5376581618119516
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            -0.20440597862636928,
+            -0.22397869516019897,
+            -0.18439068244122678
+          ],
+          "outcome_wasserstein": [
+            0.2577226256486596,
+            0.24305464521029,
+            0.2711689185949176
+          ],
+          "feasible_rate": [
+            0.1,
+            0.068,
+            0.14
+          ],
+          "constraint_feasible_rate": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "constraint_abstention_rate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean_absolute_gap_reduction": [
+            -0.0022996774404935535,
+            -0.03383931243237503,
+            0.03155539135279888
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            -0.02571129529085936,
+            -0.23591450473255485,
+            0.13814476862921066
+          ],
+          "recipient_level_closure": [
+            -0.010775385151984729,
+            -0.18114596991445814,
+            0.13228069285796612
+          ],
+          "overshoot_rate": [
+            0.78,
+            0.728,
+            0.832
+          ],
+          "overshoot_magnitude": [
+            0.17141308067152083,
+            0.15378969357804978,
+            0.19096651237519052
+          ],
+          "n": 250,
+          "eta": 0.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.5,
+          "max_outcome_wasserstein": null,
+          "method": "ordinary_actionable_recourse",
+          "is_ordinary_actionable_baseline": true,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cost": [
+            0.252293890953064,
+            0.19064388216137887,
+            0.3137670091867447
+          ],
+          "shortfall": [
+            0.451661796643298,
+            0.40833867783889755,
+            0.48961973043541046
+          ],
+          "direct_effect": [
+            0.06148157201855633,
+            0.057011559087855906,
+            0.0661807278839751
+          ],
+          "transport": [
+            0.4992737669898569,
+            0.4901781631242633,
+            0.5085308387667462
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            0.09545897949741762,
+            0.078085287085178,
+            0.11416540159206268
+          ],
+          "outcome_wasserstein": [
+            0.169255195209867,
+            0.15507112328017084,
+            0.18377658277199332
+          ],
+          "feasible_rate": [
+            0.02,
+            0.004,
+            0.04
+          ],
+          "constraint_feasible_rate": [
+            0.308,
+            0.252,
+            0.368
+          ],
+          "constraint_abstention_rate": [
+            0.692,
+            0.632,
+            0.748
+          ],
+          "mean_absolute_gap_reduction": [
+            0.08841488276090692,
+            0.07050949674236622,
+            0.10778221598522775
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            0.5209858627158152,
+            0.43595262221681463,
+            0.6109744118121961
+          ],
+          "recipient_level_closure": [
+            0.41427741044929256,
+            0.34425096240508696,
+            0.48527766235764913
+          ],
+          "overshoot_rate": [
+            0.196,
+            0.148,
+            0.248
+          ],
+          "overshoot_magnitude": [
+            0.007704156750447275,
+            0.0053801004052770615,
+            0.010145894911121235
+          ],
+          "n": 250,
+          "eta": 10.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.5,
+          "max_outcome_wasserstein": 0.1,
+          "method": "distribution_constrained_recourse",
+          "is_ordinary_actionable_baseline": false,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.5466971580066745,
+            0.37173586103032913,
+            0.7358995601325143
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            -0.4329912433624268,
+            -0.5310154620110988,
+            -0.33847836283147337
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            -0.692,
+            -0.752,
+            -0.6359000000000001
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.09071456020140048,
+            0.06614261849315536,
+            0.11460952116884116
+          ]
+        }
+      ]
+    },
+    {
+      "min_success_probability": 0.6,
+      "constraint_diagnostics": {
+        "n_recipients": 250,
+        "classifier_threshold": 0.5,
+        "min_success_probability": 0.6,
+        "reference_success_probability": {
+          "n": 250,
+          "mean": 0.32522,
+          "sd": 0.22008498632305493,
+          "min": 0.0,
+          "q25": 0.13125,
+          "median": 0.345,
+          "q75": 0.4975,
+          "q90": 0.6405,
+          "max": 0.715
+        },
+        "reference_validity_rate": 0.144,
+        "reference_validity_n": 36,
+        "validity_only_coverage": 1.0,
+        "validity_only_n": 250,
+        "minimum_attainable_w1_among_valid_actions": {
+          "n": 250,
+          "mean": 0.1912978784933824,
+          "sd": 0.12174624884449974,
+          "min": 0.029577559107297716,
+          "q25": 0.10265562581004124,
+          "median": 0.16121755737966448,
+          "q75": 0.2491486907658319,
+          "q90": 0.3982290137528268,
+          "max": 0.5491250791541015
+        },
+        "compatibility_threshold": {
+          "n": 250,
+          "mean": 0.08001671788217507,
+          "sd": 0.09116255384540649,
+          "min": 0.0,
+          "q25": 0.007398168779909618,
+          "median": 0.03907113503664736,
+          "q75": 0.12273067649453889,
+          "q90": 0.2514443318699489,
+          "max": 0.2913204713095914
+        },
+        "bound_violations": 0,
+        "abstention_causes": {
+          "epsilon": 0.1,
+          "no_recourse_rate": 0.0,
+          "target_incompatible_rate": 0.288,
+          "unreachable_rate": 0.468,
+          "feasible_rate": 0.244
+        },
+        "coverage_vs_epsilon": [
+          {
+            "epsilon": 0.025,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": 0.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.05,
+            "coverage": 0.056,
+            "n_feasible": 14,
+            "coverage_reference_valid": 0.3333333333333333,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.009345794392523364,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.075,
+            "coverage": 0.172,
+            "n_feasible": 43,
+            "coverage_reference_valid": 0.8611111111111112,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.056074766355140186,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.1,
+            "coverage": 0.244,
+            "n_feasible": 61,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.11682242990654206,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.15,
+            "coverage": 0.456,
+            "n_feasible": 114,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.3644859813084112,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.2,
+            "coverage": 0.66,
+            "n_feasible": 165,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.602803738317757,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.3,
+            "coverage": 0.804,
+            "n_feasible": 201,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.7710280373831776,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.4,
+            "coverage": 0.9,
+            "n_feasible": 225,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.883177570093458,
+            "n_reference_invalid": 214
+          },
+          {
+            "epsilon": 0.5,
+            "coverage": 0.984,
+            "n_feasible": 246,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 36,
+            "coverage_reference_invalid": 0.9813084112149533,
+            "n_reference_invalid": 214
+          }
+        ]
+      },
+      "rows": [
+        {
+          "cost": [
+            0.7892242641448974,
+            0.6973719644516706,
+            0.8997586454808711
+          ],
+          "shortfall": [
+            0.05670879479606567,
+            0.05180712591300437,
+            0.06146786645838178
+          ],
+          "direct_effect": [
+            0.09297402467398092,
+            0.09102425219484712,
+            0.09490071067649751
+          ],
+          "transport": [
+            0.531100190793574,
+            0.523074954965245,
+            0.5394565148776508
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            -0.23082226780790424,
+            -0.25209865173624146,
+            -0.20777465323727765
+          ],
+          "outcome_wasserstein": [
+            0.28143882217446525,
+            0.2644610488443094,
+            0.29650546744157497
+          ],
+          "feasible_rate": [
+            0.116,
+            0.08,
+            0.156
+          ],
+          "constraint_feasible_rate": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "constraint_abstention_rate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean_absolute_gap_reduction": [
+            -0.02747881792494068,
+            -0.06150639718210913,
+            0.00815644551941232
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            -0.15826850509095802,
+            -0.39011856009785323,
+            0.022459795421905383
+          ],
+          "recipient_level_closure": [
+            -0.12875494686722,
+            -0.31335779029333555,
+            0.03965167763339075
+          ],
+          "overshoot_rate": [
+            0.788,
+            0.736,
+            0.8360999999999998
+          ],
+          "overshoot_magnitude": [
+            0.1952428780048416,
+            0.17512893830531662,
+            0.2159282482003495
+          ],
+          "n": 250,
+          "eta": 0.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.6,
+          "max_outcome_wasserstein": null,
+          "method": "ordinary_actionable_recourse",
+          "is_ordinary_actionable_baseline": true,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cost": [
+            0.17816902184486388,
+            0.13548736236691475,
+            0.2165995214939117
+          ],
+          "shortfall": [
+            0.47218013894743943,
+            0.4316845976367627,
+            0.5108843187055125
+          ],
+          "direct_effect": [
+            0.059993354123059624,
+            0.055513260747995605,
+            0.06458714555600407
+          ],
+          "transport": [
+            0.4977241769604385,
+            0.488436693656154,
+            0.5069474900834374
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            0.11245519671898925,
+            0.09284622046634095,
+            0.13274978678399735
+          ],
+          "outcome_wasserstein": [
+            0.18542755559990115,
+            0.1712335637175042,
+            0.19955436327450699
+          ],
+          "feasible_rate": [
+            0.028,
+            0.008,
+            0.048
+          ],
+          "constraint_feasible_rate": [
+            0.244,
+            0.192,
+            0.3
+          ],
+          "constraint_abstention_rate": [
+            0.756,
+            0.7039,
+            0.808
+          ],
+          "mean_absolute_gap_reduction": [
+            0.072262924747435,
+            0.05539395457662056,
+            0.09161163324380225
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            0.4356986705380904,
+            0.35007895279196066,
+            0.5224367997044063
+          ],
+          "recipient_level_closure": [
+            0.3385956798338505,
+            0.2701525471316994,
+            0.4104752038383101
+          ],
+          "overshoot_rate": [
+            0.172,
+            0.128,
+            0.22
+          ],
+          "overshoot_magnitude": [
+            0.00728202714639742,
+            0.005182763508316269,
+            0.009627248352657226
+          ],
+          "n": 250,
+          "eta": 10.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.6,
+          "max_outcome_wasserstein": 0.1,
+          "method": "distribution_constrained_recourse",
+          "is_ordinary_actionable_baseline": false,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.5939671756290484,
+            0.4100801042694677,
+            0.802796741537802
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            -0.6110552423000336,
+            -0.7354552205532789,
+            -0.5025438680768013
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            -0.756,
+            -0.812,
+            -0.704
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.09974174267237568,
+            0.07142507057623668,
+            0.12764315444708382
+          ]
+        }
+      ]
+    },
+    {
+      "min_success_probability": 0.7,
+      "constraint_diagnostics": {
+        "n_recipients": 250,
+        "classifier_threshold": 0.5,
+        "min_success_probability": 0.7,
+        "reference_success_probability": {
+          "n": 250,
+          "mean": 0.32522,
+          "sd": 0.22008498632305493,
+          "min": 0.0,
+          "q25": 0.13125,
+          "median": 0.345,
+          "q75": 0.4975,
+          "q90": 0.6405,
+          "max": 0.715
+        },
+        "reference_validity_rate": 0.02,
+        "reference_validity_n": 5,
+        "validity_only_coverage": 1.0,
+        "validity_only_n": 250,
+        "minimum_attainable_w1_among_valid_actions": {
+          "n": 250,
+          "mean": 0.21709473244197316,
+          "sd": 0.13344558814215943,
+          "min": 0.029577559107297716,
+          "q25": 0.12196468182178699,
+          "median": 0.18554411480861677,
+          "q75": 0.2639887490720872,
+          "q90": 0.4514976232441729,
+          "max": 0.5938398394469412
+        },
+        "compatibility_threshold": {
+          "n": 250,
+          "mean": 0.10852842521438615,
+          "sd": 0.10458092361378034,
+          "min": 0.0,
+          "q25": 0.024699744246900093,
+          "median": 0.0697538081556559,
+          "q75": 0.1630810826737435,
+          "q90": 0.30025827292026974,
+          "max": 0.34116847423429164
+        },
+        "bound_violations": 0,
+        "abstention_causes": {
+          "epsilon": 0.1,
+          "no_recourse_rate": 0.0,
+          "target_incompatible_rate": 0.38,
+          "unreachable_rate": 0.444,
+          "feasible_rate": 0.176
+        },
+        "coverage_vs_epsilon": [
+          {
+            "epsilon": 0.025,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": 0.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.05,
+            "coverage": 0.024,
+            "n_feasible": 6,
+            "coverage_reference_valid": 0.2,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.02040816326530612,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.075,
+            "coverage": 0.1,
+            "n_feasible": 25,
+            "coverage_reference_valid": 0.6,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.08979591836734693,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.1,
+            "coverage": 0.176,
+            "n_feasible": 44,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.15918367346938775,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.15,
+            "coverage": 0.348,
+            "n_feasible": 87,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.3346938775510204,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.2,
+            "coverage": 0.588,
+            "n_feasible": 147,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.5795918367346938,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.3,
+            "coverage": 0.788,
+            "n_feasible": 197,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.7836734693877551,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.4,
+            "coverage": 0.852,
+            "n_feasible": 213,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.8489795918367347,
+            "n_reference_invalid": 245
+          },
+          {
+            "epsilon": 0.5,
+            "coverage": 0.956,
+            "n_feasible": 239,
+            "coverage_reference_valid": 1.0,
+            "n_reference_valid": 5,
+            "coverage_reference_invalid": 0.9551020408163265,
+            "n_reference_invalid": 245
+          }
+        ]
+      },
+      "rows": [
+        {
+          "cost": [
+            0.8552035927772522,
+            0.7395831618070603,
+            0.9943116651535034
+          ],
+          "shortfall": [
+            0.04449390287333613,
+            0.04038206258875997,
+            0.04834499833465625
+          ],
+          "direct_effect": [
+            0.09104092632046236,
+            0.08900389166282603,
+            0.09312733631207154
+          ],
+          "transport": [
+            0.5327088208708167,
+            0.5249873397266307,
+            0.541342631718915
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            -0.2560274892546967,
+            -0.2785921976024334,
+            -0.23201345842773077
+          ],
+          "outcome_wasserstein": [
+            0.302227918862415,
+            0.28373853844810265,
+            0.3184647960474003
+          ],
+          "feasible_rate": [
+            0.132,
+            0.096,
+            0.176
+          ],
+          "constraint_feasible_rate": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "constraint_abstention_rate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean_absolute_gap_reduction": [
+            -0.0505351892953276,
+            -0.08353707827869872,
+            -0.015090878784480729
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            -0.2847485645883334,
+            -0.5370192837548979,
+            -0.08718378694040585
+          ],
+          "recipient_level_closure": [
+            -0.2367880463569414,
+            -0.43447318931635226,
+            -0.05824335946129057
+          ],
+          "overshoot_rate": [
+            0.808,
+            0.764,
+            0.856
+          ],
+          "overshoot_magnitude": [
+            0.21520702909793818,
+            0.19497564560200817,
+            0.2368075459882593
+          ],
+          "n": 250,
+          "eta": 0.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.7,
+          "max_outcome_wasserstein": null,
+          "method": "ordinary_actionable_recourse",
+          "is_ordinary_actionable_baseline": true,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cost": [
+            0.1300661835670471,
+            0.0940029840528965,
+            0.16869426151514053
+          ],
+          "shortfall": [
+            0.49062812504865755,
+            0.45055962053355303,
+            0.5283355533969115
+          ],
+          "direct_effect": [
+            0.059291949146045235,
+            0.054788483859496244,
+            0.06400439520161932
+          ],
+          "transport": [
+            0.49591735950618987,
+            0.4867514926173873,
+            0.505609846759945
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            0.13159205269726346,
+            0.11076360096030284,
+            0.15299404068975975
+          ],
+          "outcome_wasserstein": [
+            0.20553167587998583,
+            0.19067178146959116,
+            0.21913190865439167
+          ],
+          "feasible_rate": [
+            0.036,
+            0.016,
+            0.06
+          ],
+          "constraint_feasible_rate": [
+            0.176,
+            0.132,
+            0.228
+          ],
+          "constraint_abstention_rate": [
+            0.824,
+            0.776,
+            0.872
+          ],
+          "mean_absolute_gap_reduction": [
+            0.05186130784577799,
+            0.03626149060274206,
+            0.06931090580218771
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            0.3396697311441522,
+            0.25419149772425886,
+            0.42643347345338933
+          ],
+          "recipient_level_closure": [
+            0.24300171697295014,
+            0.17440181871002206,
+            0.3051163371856401
+          ],
+          "overshoot_rate": [
+            0.152,
+            0.104,
+            0.1960999999999999
+          ],
+          "overshoot_magnitude": [
+            0.007914407608088819,
+            0.005421277877183325,
+            0.010621829969282758
+          ],
+          "n": 250,
+          "eta": 10.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.7,
+          "max_outcome_wasserstein": 0.1,
+          "method": "distribution_constrained_recourse",
+          "is_ordinary_actionable_baseline": false,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.6244182957324856,
+            0.4368554685094206,
+            0.8609411307726255
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            -0.7251374092102051,
+            -0.8694951247870922,
+            -0.5953224928349257
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            -0.824,
+            -0.872,
+            -0.776
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.10239649714110559,
+            0.07280835462550862,
+            0.134671731084191
+          ]
+        }
+      ]
+    },
+    {
+      "min_success_probability": 0.8,
+      "constraint_diagnostics": {
+        "n_recipients": 250,
+        "classifier_threshold": 0.5,
+        "min_success_probability": 0.8,
+        "reference_success_probability": {
+          "n": 250,
+          "mean": 0.32522,
+          "sd": 0.22008498632305493,
+          "min": 0.0,
+          "q25": 0.13125,
+          "median": 0.345,
+          "q75": 0.4975,
+          "q90": 0.6405,
+          "max": 0.715
+        },
+        "reference_validity_rate": 0.0,
+        "reference_validity_n": 0,
+        "validity_only_coverage": 1.0,
+        "validity_only_n": 250,
+        "minimum_attainable_w1_among_valid_actions": {
+          "n": 250,
+          "mean": 0.2513847845462782,
+          "sd": 0.13899367898325624,
+          "min": 0.06938153443019729,
+          "q25": 0.15631912098543954,
+          "median": 0.21790481885436852,
+          "q75": 0.2970926182205265,
+          "q90": 0.4742413947472577,
+          "max": 0.6366194575025033
+        },
+        "compatibility_threshold": {
+          "n": 250,
+          "mean": 0.14200133255380804,
+          "sd": 0.11572418694624277,
+          "min": 0.0035252378880977716,
+          "q25": 0.05071907920762903,
+          "median": 0.10595392171293509,
+          "q75": 0.20547520668711533,
+          "q90": 0.34949132709461295,
+          "max": 0.391063691482705
+        },
+        "bound_violations": 0,
+        "abstention_causes": {
+          "epsilon": 0.1,
+          "no_recourse_rate": 0.0,
+          "target_incompatible_rate": 0.528,
+          "unreachable_rate": 0.38,
+          "feasible_rate": 0.092
+        },
+        "coverage_vs_epsilon": [
+          {
+            "epsilon": 0.025,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.05,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.075,
+            "coverage": 0.012,
+            "n_feasible": 3,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.012,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.1,
+            "coverage": 0.092,
+            "n_feasible": 23,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.092,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.15,
+            "coverage": 0.228,
+            "n_feasible": 57,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.228,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.2,
+            "coverage": 0.448,
+            "n_feasible": 112,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.448,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.3,
+            "coverage": 0.752,
+            "n_feasible": 188,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.752,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.4,
+            "coverage": 0.82,
+            "n_feasible": 205,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.82,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.5,
+            "coverage": 0.936,
+            "n_feasible": 234,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.936,
+            "n_reference_invalid": 250
+          }
+        ]
+      },
+      "rows": [
+        {
+          "cost": [
+            1.0227776527404786,
+            0.8661567411124707,
+            1.1977331930220125
+          ],
+          "shortfall": [
+            0.028357807711589616,
+            0.02542383691523642,
+            0.03144777614174263
+          ],
+          "direct_effect": [
+            0.08768775090503354,
+            0.08538983993835929,
+            0.09005614680867065
+          ],
+          "transport": [
+            0.5338694502590597,
+            0.5258446699830628,
+            0.5429497029243373
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            -0.2923650835199675,
+            -0.31493548247903386,
+            -0.26901489657453864
+          ],
+          "outcome_wasserstein": [
+            0.32953710777138323,
+            0.3105818534847903,
+            0.3476338781384352
+          ],
+          "feasible_rate": [
+            0.172,
+            0.132,
+            0.224
+          ],
+          "constraint_feasible_rate": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "constraint_abstention_rate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean_absolute_gap_reduction": [
+            -0.08578219284091884,
+            -0.11962304372331713,
+            -0.0488330817922912
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            -0.46709098496202195,
+            -0.7161232919283115,
+            -0.25451026281467887
+          ],
+          "recipient_level_closure": [
+            -0.40194165962872086,
+            -0.6115893584516232,
+            -0.22045925168298516
+          ],
+          "overshoot_rate": [
+            0.824,
+            0.78,
+            0.868
+          ],
+          "overshoot_magnitude": [
+            0.24936298926566597,
+            0.22684941324111935,
+            0.2728967664201257
+          ],
+          "n": 250,
+          "eta": 0.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.8,
+          "max_outcome_wasserstein": null,
+          "method": "ordinary_actionable_recourse",
+          "is_ordinary_actionable_baseline": true,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cost": [
+            0.09701774215698242,
+            0.05256528411507607,
+            0.1492347697019577
+          ],
+          "shortfall": [
+            0.5060647726574353,
+            0.46657641567552194,
+            0.5453930191168049
+          ],
+          "direct_effect": [
+            0.06060309500705269,
+            0.05572214522071028,
+            0.06581071752865911
+          ],
+          "transport": [
+            0.49541969244167205,
+            0.48620100277846673,
+            0.5054389004290104
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            0.15896458351362067,
+            0.13755134356685852,
+            0.1801596529090044
+          ],
+          "outcome_wasserstein": [
+            0.22942026935131762,
+            0.21450064118515846,
+            0.2438113298985896
+          ],
+          "feasible_rate": [
+            0.044,
+            0.02,
+            0.06809999999999991
+          ],
+          "constraint_feasible_rate": [
+            0.092,
+            0.06,
+            0.1280999999999999
+          ],
+          "constraint_abstention_rate": [
+            0.908,
+            0.868,
+            0.9400999999999998
+          ],
+          "mean_absolute_gap_reduction": [
+            0.02908225962349429,
+            0.016009760192333838,
+            0.04369306170334317
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            0.20231409102192754,
+            0.12768309920017074,
+            0.2805850570891893
+          ],
+          "recipient_level_closure": [
+            0.13626804482019128,
+            0.08196495148707543,
+            0.19800218173689044
+          ],
+          "overshoot_rate": [
+            0.092,
+            0.056,
+            0.128
+          ],
+          "overshoot_magnitude": [
+            0.005617666311052071,
+            0.0034557337142481705,
+            0.008192932544933815
+          ],
+          "n": 250,
+          "eta": 10.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.8,
+          "max_outcome_wasserstein": 0.1,
+          "method": "distribution_constrained_recourse",
+          "is_ordinary_actionable_baseline": false,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.6694050759839495,
+            0.45887738279870804,
+            0.9255249762703156
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            -0.925759910583496,
+            -1.1150260108470915,
+            -0.7542182702869177
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            -0.908,
+            -0.944,
+            -0.872
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.11486445246441312,
+            0.08402386770377418,
+            0.1474745913815165
+          ]
+        }
+      ]
+    },
+    {
+      "min_success_probability": 0.9,
+      "constraint_diagnostics": {
+        "n_recipients": 250,
+        "classifier_threshold": 0.5,
+        "min_success_probability": 0.9,
+        "reference_success_probability": {
+          "n": 250,
+          "mean": 0.32522,
+          "sd": 0.22008498632305493,
+          "min": 0.0,
+          "q25": 0.13125,
+          "median": 0.345,
+          "q75": 0.4975,
+          "q90": 0.6405,
+          "max": 0.715
+        },
+        "reference_validity_rate": 0.0,
+        "reference_validity_n": 0,
+        "validity_only_coverage": 1.0,
+        "validity_only_n": 250,
+        "minimum_attainable_w1_among_valid_actions": {
+          "n": 250,
+          "mean": 0.2840032030715819,
+          "sd": 0.13875203823755505,
+          "min": 0.09097757346419827,
+          "q25": 0.19002563747940068,
+          "median": 0.2531420201041911,
+          "q75": 0.3244815235720985,
+          "q90": 0.47618424948987986,
+          "max": 0.6618560159176071
+        },
+        "compatibility_threshold": {
+          "n": 250,
+          "mean": 0.18042370176454559,
+          "sd": 0.12395928260700895,
+          "min": 0.020937875434756305,
+          "q25": 0.082573427585885,
+          "median": 0.1455204159021379,
+          "q75": 0.2515188130945901,
+          "q90": 0.39901981948397625,
+          "max": 0.4409893210337036
+        },
+        "bound_violations": 0,
+        "abstention_causes": {
+          "epsilon": 0.1,
+          "no_recourse_rate": 0.0,
+          "target_incompatible_rate": 0.688,
+          "unreachable_rate": 0.304,
+          "feasible_rate": 0.008
+        },
+        "coverage_vs_epsilon": [
+          {
+            "epsilon": 0.025,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.05,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.075,
+            "coverage": 0.0,
+            "n_feasible": 0,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.0,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.1,
+            "coverage": 0.008,
+            "n_feasible": 2,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.008,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.15,
+            "coverage": 0.108,
+            "n_feasible": 27,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.108,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.2,
+            "coverage": 0.292,
+            "n_feasible": 73,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.292,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.3,
+            "coverage": 0.712,
+            "n_feasible": 178,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.712,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.4,
+            "coverage": 0.804,
+            "n_feasible": 201,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.804,
+            "n_reference_invalid": 250
+          },
+          {
+            "epsilon": 0.5,
+            "coverage": 0.916,
+            "n_feasible": 229,
+            "coverage_reference_valid": null,
+            "n_reference_valid": 0,
+            "coverage_reference_invalid": 0.916,
+            "n_reference_invalid": 250
+          }
+        ]
+      },
+      "rows": [
+        {
+          "cost": [
+            1.1994577767848968,
+            1.006558556240797,
+            1.4031275171935558
+          ],
+          "shortfall": [
+            0.01123002243232051,
+            0.009766077994047818,
+            0.012690333072881161
+          ],
+          "direct_effect": [
+            0.08226935421197744,
+            0.07954375927124713,
+            0.08512267664657015
+          ],
+          "transport": [
+            0.5373021434524655,
+            0.5294596875598654,
+            0.5465181752238051
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            -0.3374649951968653,
+            -0.36059362799411787,
+            -0.3145451943844141
+          ],
+          "outcome_wasserstein": [
+            0.37150819605056584,
+            0.3525722306616186,
+            0.3883864086434928
+          ],
+          "feasible_rate": [
+            0.296,
+            0.2439,
+            0.352
+          ],
+          "constraint_feasible_rate": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "constraint_abstention_rate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean_absolute_gap_reduction": [
+            -0.13075505241533927,
+            -0.16316168756983698,
+            -0.09472525590129695
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            -0.6934028038945359,
+            -0.9660694937145825,
+            -0.46587045544945604
+          ],
+          "recipient_level_closure": [
+            -0.6126668138470837,
+            -0.83419230323069,
+            -0.40795936373309816
+          ],
+          "overshoot_rate": [
+            0.836,
+            0.792,
+            0.88
+          ],
+          "overshoot_magnitude": [
+            0.2909768190525841,
+            0.26776205427539945,
+            0.3147098887168985
+          ],
+          "n": 250,
+          "eta": 0.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.9,
+          "max_outcome_wasserstein": null,
+          "method": "ordinary_actionable_recourse",
+          "is_ordinary_actionable_baseline": true,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cost": [
+            0.007024874925613403,
+            0.0,
+            0.018592400074005127
+          ],
+          "shortfall": [
+            0.5361577003641987,
+            0.50091690005,
+            0.5735086605454872
+          ],
+          "direct_effect": [
+            0.06078244406980141,
+            0.055719970858506995,
+            0.066136959858727
+          ],
+          "transport": [
+            0.500056732827574,
+            0.4895227355984188,
+            0.511728964829266
+          ],
+          "pre_recourse_mediated_prediction_disparity": [
+            0.03272994783893227,
+            0.028341776256170126,
+            0.037362179163098336
+          ],
+          "pre_recourse_factual_mediated_prediction_disparity": [
+            0.19928217575921908,
+            0.17969574866500743,
+            0.2215058220663786
+          ],
+          "post_recourse_mediated_prediction_disparity": [
+            0.19709688002592735,
+            0.17614039010196292,
+            0.21776302550227877
+          ],
+          "outcome_wasserstein": [
+            0.2584306639428851,
+            0.2432410734077602,
+            0.27519707746994726
+          ],
+          "feasible_rate": [
+            0.056,
+            0.032,
+            0.084
+          ],
+          "constraint_feasible_rate": [
+            0.008,
+            0.0,
+            0.02
+          ],
+          "constraint_abstention_rate": [
+            0.992,
+            0.98,
+            1.0
+          ],
+          "mean_absolute_gap_reduction": [
+            0.0009368963174926925,
+            0.0,
+            0.002556525396157277
+          ],
+          "factual_mediated_prediction_disparity_closure": [
+            0.010965836382337057,
+            0.0,
+            0.028826782021561886
+          ],
+          "recipient_level_closure": [
+            0.004389928122394693,
+            0.0,
+            0.011407413041393515
+          ],
+          "overshoot_rate": [
+            0.008,
+            0.0,
+            0.02
+          ],
+          "overshoot_magnitude": [
+            0.0006241997078995278,
+            0.0,
+            0.001565819038644983
+          ],
+          "n": 250,
+          "eta": 10.0,
+          "lambda_invariance": 0.0,
+          "rho_anchor": 0.0,
+          "min_success_probability": 0.9,
+          "max_outcome_wasserstein": 0.1,
+          "method": "distribution_constrained_recourse",
+          "is_ordinary_actionable_baseline": false,
+          "factual_closure_gain_vs_actionable_baseline": [
+            0.704368640276873,
+            0.47586458504085744,
+            0.9905491729004358
+          ],
+          "cost_difference_vs_actionable_baseline": [
+            -1.1924329018592834,
+            -1.3988896109938622,
+            -1.0040855387538674
+          ],
+          "feasibility_difference_vs_actionable_baseline": [
+            -0.992,
+            -1.0,
+            -0.98
+          ],
+          "paired_absolute_gap_gain_vs_actionable_baseline": [
+            0.13169194873283194,
+            0.09785207098859519,
+            0.16705344503624242
+          ]
+        }
+      ]
+    }
+  ],
   "rows": [
     {
       "cost": [
@@ -23043,24 +24854,24 @@
     },
     {
       "cost": [
-        1.0227776527404786,
-        0.8661567411124707,
-        1.1977331930220125
+        0.6852851343154908,
+        0.628407107564807,
+        0.74885417098701
       ],
       "shortfall": [
-        0.028357807711589616,
-        0.02542383691523642,
-        0.03144777614174263
+        0.07261988497951406,
+        0.06594893373853991,
+        0.07929146967969082
       ],
       "direct_effect": [
-        0.08768775090503354,
-        0.08538983993835929,
-        0.09005614680867065
+        0.09421808222435343,
+        0.09246136898729244,
+        0.09584817468262453
       ],
       "transport": [
-        0.5338694502590597,
-        0.5258446699830628,
-        0.5429497029243373
+        0.529434883429408,
+        0.5218844610822834,
+        0.5376581618119516
       ],
       "pre_recourse_mediated_prediction_disparity": [
         0.03272994783893227,
@@ -23073,19 +24884,19 @@
         0.2215058220663786
       ],
       "post_recourse_mediated_prediction_disparity": [
-        -0.2923650835199675,
-        -0.31493548247903386,
-        -0.26901489657453864
+        -0.20440597862636928,
+        -0.22397869516019897,
+        -0.18439068244122678
       ],
       "outcome_wasserstein": [
-        0.32953710777138323,
-        0.3105818534847903,
-        0.3476338781384352
+        0.2577226256486596,
+        0.24305464521029,
+        0.2711689185949176
       ],
       "feasible_rate": [
-        0.172,
-        0.132,
-        0.224
+        0.1,
+        0.068,
+        0.14
       ],
       "constraint_feasible_rate": [
         1.0,
@@ -23098,35 +24909,35 @@
         0.0
       ],
       "mean_absolute_gap_reduction": [
-        -0.08578219284091884,
-        -0.11962304372331713,
-        -0.0488330817922912
+        -0.0022996774404935535,
+        -0.03383931243237503,
+        0.03155539135279888
       ],
       "factual_mediated_prediction_disparity_closure": [
-        -0.46709098496202195,
-        -0.7161232919283115,
-        -0.25451026281467887
+        -0.02571129529085936,
+        -0.23591450473255485,
+        0.13814476862921066
       ],
       "recipient_level_closure": [
-        -0.40194165962872086,
-        -0.6115893584516232,
-        -0.22045925168298516
+        -0.010775385151984729,
+        -0.18114596991445814,
+        0.13228069285796612
       ],
       "overshoot_rate": [
-        0.824,
         0.78,
-        0.868
+        0.728,
+        0.832
       ],
       "overshoot_magnitude": [
-        0.24936298926566597,
-        0.22684941324111935,
-        0.2728967664201257
+        0.17141308067152083,
+        0.15378969357804978,
+        0.19096651237519052
       ],
       "n": 250,
       "eta": 0.0,
       "lambda_invariance": 0.0,
       "rho_anchor": 0.0,
-      "min_success_probability": 0.8,
+      "min_success_probability": 0.5,
       "max_outcome_wasserstein": null,
       "method": "ordinary_actionable_recourse",
       "is_ordinary_actionable_baseline": true,
@@ -23154,24 +24965,24 @@
     },
     {
       "cost": [
-        0.09701774215698242,
-        0.05256528411507607,
-        0.1492347697019577
+        0.252293890953064,
+        0.19064388216137887,
+        0.3137670091867447
       ],
       "shortfall": [
-        0.5060647726574353,
-        0.46657641567552194,
-        0.5453930191168049
+        0.451661796643298,
+        0.40833867783889755,
+        0.48961973043541046
       ],
       "direct_effect": [
-        0.06060309500705269,
-        0.05572214522071028,
-        0.06581071752865911
+        0.06148157201855633,
+        0.057011559087855906,
+        0.0661807278839751
       ],
       "transport": [
-        0.49541969244167205,
-        0.48620100277846673,
-        0.5054389004290104
+        0.4992737669898569,
+        0.4901781631242633,
+        0.5085308387667462
       ],
       "pre_recourse_mediated_prediction_disparity": [
         0.03272994783893227,
@@ -23184,82 +24995,82 @@
         0.2215058220663786
       ],
       "post_recourse_mediated_prediction_disparity": [
-        0.15896458351362067,
-        0.13755134356685852,
-        0.1801596529090044
+        0.09545897949741762,
+        0.078085287085178,
+        0.11416540159206268
       ],
       "outcome_wasserstein": [
-        0.22942026935131762,
-        0.21450064118515846,
-        0.2438113298985896
+        0.169255195209867,
+        0.15507112328017084,
+        0.18377658277199332
       ],
       "feasible_rate": [
-        0.044,
         0.02,
-        0.06809999999999991
+        0.004,
+        0.04
       ],
       "constraint_feasible_rate": [
-        0.092,
-        0.06,
-        0.1280999999999999
+        0.308,
+        0.252,
+        0.368
       ],
       "constraint_abstention_rate": [
-        0.908,
-        0.868,
-        0.9400999999999998
+        0.692,
+        0.632,
+        0.748
       ],
       "mean_absolute_gap_reduction": [
-        0.02908225962349429,
-        0.016009760192333838,
-        0.04369306170334317
+        0.08841488276090692,
+        0.07050949674236622,
+        0.10778221598522775
       ],
       "factual_mediated_prediction_disparity_closure": [
-        0.20231409102192754,
-        0.12768309920017074,
-        0.2805850570891893
+        0.5209858627158152,
+        0.43595262221681463,
+        0.6109744118121961
       ],
       "recipient_level_closure": [
-        0.13626804482019128,
-        0.08196495148707543,
-        0.19800218173689044
+        0.41427741044929256,
+        0.34425096240508696,
+        0.48527766235764913
       ],
       "overshoot_rate": [
-        0.092,
-        0.056,
-        0.128
+        0.196,
+        0.148,
+        0.248
       ],
       "overshoot_magnitude": [
-        0.005617666311052071,
-        0.0034557337142481705,
-        0.008192932544933815
+        0.007704156750447275,
+        0.0053801004052770615,
+        0.010145894911121235
       ],
       "n": 250,
       "eta": 10.0,
       "lambda_invariance": 0.0,
       "rho_anchor": 0.0,
-      "min_success_probability": 0.8,
+      "min_success_probability": 0.5,
       "max_outcome_wasserstein": 0.1,
       "method": "distribution_constrained_recourse",
       "is_ordinary_actionable_baseline": false,
       "factual_closure_gain_vs_actionable_baseline": [
-        0.6694050759839495,
-        0.45887738279870804,
-        0.9255249762703156
+        0.5466971580066745,
+        0.37173586103032913,
+        0.7358995601325143
       ],
       "cost_difference_vs_actionable_baseline": [
-        -0.925759910583496,
-        -1.1150260108470915,
-        -0.7542182702869177
+        -0.4329912433624268,
+        -0.5310154620110988,
+        -0.33847836283147337
       ],
       "feasibility_difference_vs_actionable_baseline": [
-        -0.908,
-        -0.944,
-        -0.872
+        -0.692,
+        -0.752,
+        -0.6359000000000001
       ],
       "paired_absolute_gap_gain_vs_actionable_baseline": [
-        0.11486445246441312,
-        0.08402386770377418,
-        0.1474745913815165
+        0.09071456020140048,
+        0.06614261849315536,
+        0.11460952116884116
       ],
       "is_effect_ratio_heuristic": false
     }

@@ -72,13 +72,32 @@ def _finite_summary(values):
     }
 
 
+def compatibility_threshold(prediction_reference, threshold,
+                            min_success_probability):
+    """Per-recipient epsilon_gamma from each empirical reference law.
+
+    epsilon_gamma = int_{1-gamma}^1 (tau - F_R^{-1}(u))_+ du, the smallest W1
+    from R_z attainable by any gamma-valid score distribution. The empirical
+    quantile function is a step function, so the integral is exact.
+    """
+    reference = np.sort(np.asarray(prediction_reference, dtype=float), axis=1)
+    n_draws = reference.shape[1]
+    upper = np.arange(1, n_draws + 1) / n_draws
+    lower = upper - 1.0 / n_draws
+    overlap = np.clip(upper - np.maximum(lower, 1.0 - min_success_probability),
+                      0.0, None)
+    return (overlap[None, :] * np.maximum(threshold - reference, 0.0)).sum(axis=1)
+
+
 def compute_constraint_diagnostics(
         all_candidates, prediction_reference, threshold,
-        min_success_probability, epsilon_grid):
+        min_success_probability, epsilon_grid, max_outcome_wasserstein=None):
     """Diagnose compatibility of validity with the prediction-W1 target."""
     prediction_reference = np.asarray(prediction_reference, dtype=float)
     reference_success = (prediction_reference >= threshold).mean(axis=1)
     reference_valid = reference_success >= min_success_probability
+    epsilon_gamma = compatibility_threshold(
+        prediction_reference, threshold, min_success_probability)
 
     minimum_w1 = []
     for candidates in all_candidates:
@@ -110,6 +129,22 @@ def compute_constraint_diagnostics(
             "n_reference_invalid": int((~reference_valid).sum()),
         })
 
+    abstention_causes = None
+    if max_outcome_wasserstein is not None:
+        epsilon = float(max_outcome_wasserstein)
+        no_recourse = ~validity_feasible
+        incompatible = validity_feasible & (epsilon < epsilon_gamma)
+        unreachable = (validity_feasible & (epsilon >= epsilon_gamma)
+                       & (minimum_w1 > epsilon))
+        abstention_causes = {
+            "epsilon": epsilon,
+            "no_recourse_rate": float(no_recourse.mean()),
+            "target_incompatible_rate": float(incompatible.mean()),
+            "unreachable_rate": float(unreachable.mean()),
+            "feasible_rate": float((validity_feasible
+                                    & (minimum_w1 <= epsilon)).mean()),
+        }
+
     return {
         "n_recipients": int(len(all_candidates)),
         "classifier_threshold": float(threshold),
@@ -120,6 +155,11 @@ def compute_constraint_diagnostics(
         "validity_only_coverage": float(validity_feasible.mean()),
         "validity_only_n": int(validity_feasible.sum()),
         "minimum_attainable_w1_among_valid_actions": _finite_summary(minimum_w1),
+        "compatibility_threshold": _finite_summary(epsilon_gamma),
+        # Theorem: every valid plan has W1 >= epsilon_gamma; should be 0.
+        "bound_violations": int(np.sum(
+            validity_feasible & (minimum_w1 < epsilon_gamma - 1e-9))),
+        "abstention_causes": abstention_causes,
         "coverage_vs_epsilon": coverage,
     }
 
@@ -568,6 +608,7 @@ def run(cfg):
                 float(rec.threshold),
                 constrained_config["min_success_probability"],
                 epsilon_grid,
+                constrained_config["max_outcome_wasserstein"],
             )
             w1_summary = constraint_diagnostics[
                 "minimum_attainable_w1_among_valid_actions"]
@@ -586,6 +627,38 @@ def run(cfg):
         rows = run_grid(candidates, references, factual_predictions, eta_grid,
                         lambda_grid, rho_grid, int(rec.disadvantaged_value),
                         int(rec.n_boot), constrained_config)
+        gamma_sensitivity = []
+        gamma_grid = (
+            [float(v) for v in rec.constrained_recourse.get(
+                "gamma_sensitivity_grid", [])]
+            if constrained_config is not None else []
+        )
+        for gamma in gamma_grid:
+            # Same candidate draws and references; only the validity level moves.
+            gamma_config = dict(constrained_config,
+                                min_success_probability=gamma)
+            gamma_rows = run_grid(
+                candidates, references, factual_predictions, [], [], [],
+                int(rec.disadvantaged_value), int(rec.n_boot), gamma_config,
+            )
+            gamma_sensitivity.append({
+                "min_success_probability": gamma,
+                "constraint_diagnostics": compute_constraint_diagnostics(
+                    candidates, references["prediction_reference"],
+                    float(rec.threshold), gamma, epsilon_grid,
+                    constrained_config["max_outcome_wasserstein"],
+                ),
+                "rows": gamma_rows,
+            })
+            by_method = {row["method"]: row for row in gamma_rows}
+            print(
+                f"  gamma={gamma:.2f}: closure ordinary="
+                f"{100 * by_method['ordinary_actionable_recourse']['recipient_level_closure'][0]:+.1f}% "
+                f"constrained="
+                f"{100 * by_method['distribution_constrained_recourse']['recipient_level_closure'][0]:+.1f}% "
+                f"abstain="
+                f"{100 * by_method['distribution_constrained_recourse']['constraint_abstention_rate'][0]:.1f}%"
+            )
         for row in rows:
             row["is_effect_ratio_heuristic"] = bool(
                 heuristic is not None and
@@ -669,7 +742,9 @@ def run(cfg):
                 "prediction draws under W|X=advantaged,Z_recipient with "
                 "the recipient's Z held fixed"
             ),
-                "sweep_association": association, "rows": rows}, f, indent=2)
+                "sweep_association": association,
+                "gamma_sensitivity": gamma_sensitivity,
+                "rows": rows}, f, indent=2)
         flat = [_flatten(row) | {"is_effect_ratio_heuristic":
                                  row["is_effect_ratio_heuristic"]}
                 for row in rows]

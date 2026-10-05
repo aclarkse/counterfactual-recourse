@@ -141,6 +141,8 @@ recourse:
     enabled: true
     min_success_probability: 0.8
     max_outcome_wasserstein: 0.1
+    # Validity levels re-evaluated on the same candidate draws.
+    gamma_sensitivity_grid: [0.5, 0.6, 0.7, 0.8, 0.9]
     epsilon_diagnostic_grid: [0.025, 0.05, 0.075, 0.1, 0.15, 0.2,
                               0.3, 0.4, 0.5]
   n_max: 0

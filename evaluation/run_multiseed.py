@@ -159,6 +159,15 @@ def _configured_min_success_probability(dataset: str) -> float | None:
     return None if value is None else float(value)
 
 
+def _configured_gamma_grid(dataset: str) -> list[float]:
+    config_path = Path(__file__).resolve().parents[1] / "conf" / "dataset" / f"{dataset}.yaml"
+    with config_path.open(encoding="utf-8") as file:
+        recourse = yaml.safe_load(file).get("recourse", {})
+    grid = recourse.get("constrained_recourse", {}).get(
+        "gamma_sensitivity_grid", [])
+    return [float(value) for value in grid]
+
+
 def _recourse_artifacts_complete(paths: list[Path], dataset: str) -> bool:
     if not all(path.exists() for path in paths):
         return False
@@ -195,6 +204,12 @@ def _recourse_artifacts_complete(paths: list[Path], dataset: str) -> bool:
                             - min_success) > 1e-9
                     for row in artifact.get("rows", [])):
                 return False
+            grid = _configured_gamma_grid(dataset)
+            if grid and [
+                    entry.get("min_success_probability")
+                    for entry in artifact.get("gamma_sensitivity", [])
+            ] != grid:
+                return False
             if dataset in {"acs", "oulad"} and not artifact.get(
                     "constraint_diagnostics", {}).get("coverage_vs_epsilon"):
                 return False
@@ -203,7 +218,8 @@ def _recourse_artifacts_complete(paths: list[Path], dataset: str) -> bool:
     return True
 
 
-def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
+def run_seed(dataset: str, seed: int, root: Path, resume: bool,
+             only_stage: str | None = None) -> None:
     paths = seed_paths(root, dataset, seed)
     overrides = common_overrides(dataset, seed, paths)
     model_names = DATASET_MODELS[dataset]
@@ -252,8 +268,15 @@ def run_seed(dataset: str, seed: int, root: Path, resume: bool) -> None:
             lambda: _recourse_artifacts_complete(recourse_products, dataset),
         ),
     ]
+    if only_stage is not None:
+        # Rerun one stage on the existing upstream artifacts of this seed.
+        stages = [entry for entry in stages if entry[0] == only_stage]
     upstream_changed = False
     for stage, command, products, is_complete in stages:
+        if only_stage is not None:
+            print(f"[{dataset} seed {seed}] rerunning {stage}", flush=True)
+            run_logged(command, paths["logs"] / f"{stage}.log")
+            continue
         if resume and not upstream_changed and is_complete():
             print(f"[{dataset} seed {seed}] skipping completed {stage}", flush=True)
             continue
@@ -290,6 +313,7 @@ def _one_row(rows: list[dict], predicate, description: str) -> dict:
 def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
     raw: list[dict] = []
     diagnostic_raw: list[dict] = []
+    gamma_raw: list[dict] = []
     for dataset in datasets:
         for seed in seeds:
             paths = seed_paths(root, dataset, seed)
@@ -309,6 +333,29 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                 with (paths["recourse"] / f"ablation_{dataset}_{slug}.json").open(
                         encoding="utf-8") as f:
                     ablation = json.load(f)
+                for entry in ablation.get("gamma_sensitivity", []):
+                    gamma_diagnostics = entry["constraint_diagnostics"]
+                    causes = gamma_diagnostics.get("abstention_causes") or {}
+                    for scenario, predicate in SCENARIOS.items():
+                        selected = _one_row(entry["rows"], predicate, scenario)
+                        record = {
+                            "dataset": dataset, "seed": seed, "model": model,
+                            "gamma": float(entry["min_success_probability"]),
+                            "scenario": scenario,
+                            "reference_validity_rate":
+                                gamma_diagnostics["reference_validity_rate"],
+                            "compatibility_threshold_median":
+                                gamma_diagnostics["compatibility_threshold"]["median"],
+                            "no_recourse_rate": causes.get("no_recourse_rate"),
+                            "target_incompatible_rate":
+                                causes.get("target_incompatible_rate"),
+                            "unreachable_rate": causes.get("unreachable_rate"),
+                            "bound_violations":
+                                gamma_diagnostics.get("bound_violations"),
+                        }
+                        for metric in RECOURSE_METRICS:
+                            record[metric] = _point(selected[metric])
+                        gamma_raw.append(record)
                 diagnostics = ablation.get("constraint_diagnostics")
                 if diagnostics is not None:
                     diagnostic_raw.append({
@@ -416,6 +463,26 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                     "coverage": _stats(values),
                 })
             diagnostic_aggregate.append(record)
+    gamma_aggregate: list[dict] = []
+    gamma_metrics = (
+        "reference_validity_rate", "compatibility_threshold_median",
+        "no_recourse_rate", "target_incompatible_rate", "unreachable_rate",
+        "bound_violations", *RECOURSE_METRICS,
+    )
+    for key in sorted({(row["dataset"], row["model"], row["gamma"],
+                        row["scenario"]) for row in gamma_raw}):
+        subset = [row for row in gamma_raw
+                  if (row["dataset"], row["model"], row["gamma"],
+                      row["scenario"]) == key]
+        gamma_aggregate.append({
+            "dataset": key[0], "model": key[1], "gamma": key[2],
+            "scenario": key[3],
+            "metrics": {
+                metric: _stats([row[metric] for row in subset
+                                if row[metric] is not None])
+                for metric in gamma_metrics
+            },
+        })
     return {
         "metadata": {
             "seeds": seeds,
@@ -426,15 +493,19 @@ def collect(root: Path, datasets: list[str], seeds: list[int]) -> dict:
                 "in each seed's ablation JSON"
             ),
             "selection": (
-                "both methods minimize cost subject to 80% factual validity "
-                "with the same abstention rule; the primary method alone adds "
-                "a recipient-conditional prediction-W1 radius of 0.10"
+                "both methods minimize cost subject to factual validity "
+                "gamma = 0.5 with the same abstention rule; the primary method "
+                "alone adds a recipient-conditional prediction-W1 radius of "
+                "0.10; gamma_sensitivity re-selects on the same draws for "
+                "each gamma in the configured grid"
             ),
         },
         "seed_level": raw,
         "aggregate": aggregate,
         "diagnostic_seed_level": diagnostic_raw,
         "diagnostic_aggregate": diagnostic_aggregate,
+        "gamma_seed_level": gamma_raw,
+        "gamma_aggregate": gamma_aggregate,
     }
 
 
@@ -524,6 +595,57 @@ def write_summary(summary: dict, output_dir: Path) -> None:
                     )
                 lines.append("")
     (output_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
+    write_gamma_summary(summary, output_dir)
+
+
+def write_gamma_summary(summary: dict, output_dir: Path) -> None:
+    records = summary.get("gamma_aggregate", [])
+    if not records:
+        return
+    lookup = {(r["dataset"], r["model"], r["gamma"], r["scenario"]): r["metrics"]
+              for r in records}
+    lines = [
+        "# Validity-level (gamma) sensitivity", "",
+        "Both methods re-select on the same candidate draws for each gamma. "
+        "Values are mean ± SD across seeds. Abstention causes refer to the "
+        "parity-constrained method: (a) no gamma-valid plan, (b) "
+        "epsilon < epsilon_gamma, (c) epsilon_gamma <= epsilon < epsilon_A.", "",
+    ]
+
+    def cell(metrics, name, factor=100.0, digits=1):
+        stats = metrics[name]
+        if not stats.get("n_seeds"):
+            return "n/a"
+        return (f"{factor * stats['mean']:.{digits}f} ± "
+                f"{factor * stats['sd']:.{digits}f}")
+
+    for dataset, model in sorted({(r["dataset"], r["model"]) for r in records}):
+        lines += [f"## {dataset.upper()} — {model}", "",
+                  "| gamma | Ref. valid % | median eps_gamma | Ord. closure % | "
+                  "Ours closure % | Ord. overshoot % | Ours abstain % | "
+                  "(a) % | (b) % | (c) % | Paired gain | Bound violations |",
+                  "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        gammas = sorted({r["gamma"] for r in records
+                         if (r["dataset"], r["model"]) == (dataset, model)})
+        for gamma in gammas:
+            ordinary = lookup[(dataset, model, gamma, "ordinary_actionable_recourse")]
+            ours = lookup[(dataset, model, gamma, "mediation_aware_recourse")]
+            lines.append(
+                f"| {gamma:.1f} | {cell(ours, 'reference_validity_rate')} | "
+                f"{cell(ours, 'compatibility_threshold_median', 1.0, 3)} | "
+                f"{cell(ordinary, 'recipient_level_closure')} | "
+                f"{cell(ours, 'recipient_level_closure')} | "
+                f"{cell(ordinary, 'overshoot_rate')} | "
+                f"{cell(ours, 'constraint_abstention_rate')} | "
+                f"{cell(ours, 'no_recourse_rate')} | "
+                f"{cell(ours, 'target_incompatible_rate')} | "
+                f"{cell(ours, 'unreachable_rate')} | "
+                f"{cell(ours, 'paired_absolute_gap_gain_vs_actionable_baseline', 1.0, 3)} | "
+                f"{cell(ours, 'bound_violations', 1.0, 0)} |"
+            )
+        lines.append("")
+    (output_dir / "gamma_sensitivity.md").write_text(
+        "\n".join(lines), encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
@@ -538,6 +660,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true",
                         help="Skip stages whose complete output set exists.")
     parser.add_argument("--aggregate-only", action="store_true")
+    parser.add_argument(
+        "--only-stage", choices=("flow", "outcome", "gap", "recourse"),
+        help="Rerun just this stage on each seed's existing upstream outputs.")
     return parser.parse_args()
 
 
@@ -547,7 +672,8 @@ def main() -> None:
     if not args.aggregate_only:
         for dataset in args.datasets:
             for seed in args.seeds:
-                run_seed(dataset, seed, args.root, args.resume)
+                run_seed(dataset, seed, args.root, args.resume,
+                         only_stage=args.only_stage)
     summary = collect(args.root, args.datasets, args.seeds)
     write_summary(summary, args.root)
     print(f"\nAggregate results written to {args.root / 'summary.md'}")
