@@ -1,0 +1,78 @@
+% Block-ordered mediator model (a) and the interventional law Q_a (b), ACS.
+% Requires: \usepackage{tikz} \usetikzlibrary{positioning,fit,arrows.meta,backgrounds}
+\begin{figure}[t]
+\centering
+\tikzset{
+  var/.style={draw, rounded corners=2pt, minimum height=5.5mm, minimum width=9mm,
+              inner sep=2pt, font=\scriptsize},
+  blk/.style={draw, dashed, rounded corners=3pt, inner sep=2.5pt},
+  ctx/.style={draw, circle, minimum size=6mm, inner sep=0pt, font=\scriptsize},
+  arr/.style={-{Stealth[length=1.6mm]}, semithick},
+  ctxarr/.style={-{Stealth[length=1.4mm]}, gray!70},
+  lab/.style={font=\tiny, align=center, text=black!75},
+  clamped/.style={var, very thick, fill=orange!20},
+  factual/.style={var, fill=gray!15},
+  redrawn/.style={var, fill=blue!10},
+}
+% ---------------- (a) natural model ----------------
+\begin{tikzpicture}[node distance=5mm and 7mm]
+  \node[var] (e) {\textsc{Educ}};
+  \node[var, right=of e] (o) {\textsc{Occ}};
+  \node[var, right=9mm of o, yshift=3.5mm] (h) {\textsc{Hours}};
+  \node[var, below=1.5mm of h] (k) {\textsc{Weeks}};
+  \node[blk, fit=(e)] (b1) {};
+  \node[blk, fit=(o)] (b2) {};
+  \node[blk, fit=(h)(k)] (b3) {};
+  \node[font=\scriptsize, above=0pt of b1] {$W_1$: $g_\phi$};
+  \node[font=\scriptsize, above=0pt of b2] {$W_2$: $g_\phi$};
+  \node[font=\scriptsize, above=0pt of b3] {$W_3$: $f_\theta$};
+  \draw[arr] (b1) -- (b2);
+  \draw[arr] (b2) -- (b3);
+  \draw[arr] (b1.north east) to[bend left=38] (b3.north west);
+  \node[ctx, below=7mm of b2, xshift=-6mm] (x) {$X$};
+  \node[ctx, right=7mm of x] (z) {$Z$};
+  \draw[{Stealth[length=1.4mm]}-{Stealth[length=1.4mm]}, dashed, gray]
+    (x) to[bend right=40] (z);
+  \foreach \b in {b1,b2,b3} {
+    \draw[ctxarr] (x) -- (\b.south);
+    \draw[ctxarr] (z) -- (\b.south);
+  }
+\end{tikzpicture}
+
+\vspace{1mm}
+{\scriptsize (a) $\hat P(W\mid X,Z)=\prod_\ell \hat P(W_\ell\mid W_{<\ell},X,Z)$}
+
+\vspace{2mm}
+% ---------------- (b) intervention on Occ ----------------
+\begin{tikzpicture}[node distance=5mm and 7mm]
+  \node[factual] (e) {$w_{0,\textsc{educ}}$};
+  \node[clamped, right=of e] (o) {$w'_{\textsc{occ}}$};
+  \node[redrawn, right=9mm of o, yshift=3.5mm] (h) {\textsc{Hours}};
+  \node[redrawn, below=1.5mm of h] (k) {\textsc{Weeks}};
+  \node[blk, fit=(e)] (b1) {};
+  \node[blk, fit=(o)] (b2) {};
+  \node[blk, fit=(h)(k)] (b3) {};
+  \draw[arr, gray!50, densely dotted] (b1) -- node[black, font=\scriptsize]{$\times$} (b2);
+  \draw[arr] (b2) -- (b3);
+  \draw[arr] (b1.north east) to[bend left=28] (b3.north west);
+  \node[lab, below=1mm of b1] {kept\\factual};
+  \node[lab, below=1mm of b2] {clamped\\(acted)};
+  \node[lab, below=1mm of b3] {redrawn from\\$\hat P(W_3\mid w_{<3},x^{(0)},z)$};
+\end{tikzpicture}
+
+\vspace{1mm}
+{\scriptsize (b) $Q_a$ for the action $a$: set \textsc{Occ} to $w'_{\textsc{occ}}$}
+\caption{Block-ordered mediator model for ACS.
+(a)~Blocks are ordered between (solid arrows) and unordered within
+(\textsc{Hours} and \textsc{Weeks} share one joint block with no edge between
+them). Every block conditions on $X$ and $Z$ (grey). Discrete blocks use
+categorical heads $g_\phi$; the continuous block uses one joint spline flow
+$f_\theta$. The block order does not
+affect the joint $P(W\mid X,Z)$ and so does not affect any $\mu_{ab}(z)$; it
+matters only for interventions.
+(b)~An action on \textsc{Occ} clamps it, cutting its dependence on earlier
+blocks; earlier blocks keep their factual values, and later blocks are
+redrawn from the learned mechanism with $X=x^{(0)}$. The resulting law of $W$
+is $Q_a$.}
+\label{fig:block_model}
+\end{figure}

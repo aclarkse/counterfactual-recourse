@@ -1,0 +1,140 @@
+\section{Experimental Details}
+\label{app:experimental-settings}
+
+This appendix collects the settings needed to reproduce the experiments of
+Section~\ref{sec:experiments}. Dataset preprocessing and roles are in
+Appendix~\ref{app:data}, and the mediator model is in
+Appendix~\ref{app:training}.
+
+\subsection{Data Splits and Seeds}
+\label{app:exp_splits}
+
+Every experiment is repeated for seeds 42--46. The seed fixes the
+train/validation split and the random state of the mediator model, the three
+classifiers, every Monte Carlo draw, and the selection of instances and
+recipients. Each seed therefore refits the whole pipeline. Law School, ACS,
+and Adult use a random 80/20 split of the full dataset, without
+stratification. German-Synth draws one pool of 10{,}000 units with generator
+seed 0, which is the same for every experimental seed, and each seed splits it
+into 8{,}000 training and 2{,}000 validation units. All models are fitted on
+the training split. All effects, recipients, and diagnostics are computed on
+the validation split.
+
+\subsection{Classifiers}
+\label{app:exp_classifiers}
+
+For each dataset we fit three classifiers with
+scikit-learn~\citep{pedregosa2011scikit} on the training split:
+\begin{itemize}[nosep]
+  \item \emph{Logistic regression} with an $\ell_2$ penalty, $C=1$, and the
+        L-BFGS solver (at most 1{,}000 iterations).
+  \item \emph{Multilayer perceptron} with two hidden layers of 64 and 32 ReLU
+        units, trained with Adam for at most 500 epochs. Early stopping holds
+        out 10\% of the training split and stops after 10 epochs without
+        improvement in held-out accuracy. All other settings are scikit-learn
+        defaults.
+  \item \emph{Random forest} with 300 trees, minimum leaf size 20, and
+        $\lfloor\sqrt d\rfloor$ candidate features per split, where $d$ is the
+        number of input columns after encoding. Trees are grown to full depth
+        and classes are unweighted.
+\end{itemize}
+Every classifier takes the full feature vector $(x,z,w)$, so the direct path
+$X\to\hat Y$ is present by construction. Each classifier is a pipeline whose
+first step one-hot encodes the categorical mediators and standardizes age and
+the continuous mediators, with all encoders fitted on the training split.
+Binary covariates, and Law School's family-income code, enter unchanged
+(Table~\ref{tab:feature_map}). The decision threshold is $\tau=0.5$
+throughout. Once fitted, a classifier is held fixed. Recourse acts on it and
+never retrains it. Validation performance is reported in
+Table~\ref{tab:app_effects}.
+
+\subsection{Monte Carlo Estimation}
+\label{app:exp_mc}
+
+All quantities are plug-in Monte Carlo estimates under the fitted mediator
+model, scored with the fitted classifier.
+
+\paragraph{Effects.}
+For each seed we draw $n=500$ validation instances without replacement. For
+each instance and each mediator arm $b\in\{0,1\}$ we draw $K=500$ mediator
+vectors from $\hat P(W\mid X=b,z)$ and evaluate every draw under both values of
+the classifier's $X$ input. Reusing the same draws in both evaluations removes
+mediator-sampling noise from the $\NDE$ estimate. Effects are reported on the
+fixed classifier's prediction scale. Within-seed 95\% intervals are
+percentile-bootstrap intervals over the 500 instances with $B=2000$
+replicates.
+
+\paragraph{Oracle effects (German-Synth).}
+For German-Synth we repeat the effect computation with mediator draws from the
+true SCM in place of the fitted model, using the same classifier, instances,
+and $K$. The difference between the two estimates isolates the error of the
+mediator model (Table~\ref{tab:oracle}). Effects on the outcome scale
+$P(Y=1)$ (Table~\ref{tab:synth_versions}) are computed from 200{,}000 draws of
+the true mechanisms.
+
+\paragraph{Recourse.}
+Recipients are the disadvantaged-group true negatives of the validation
+split. When there are more than 250 we draw 250 without replacement. Law
+School has 33--46 per seed and classifier, and we use all of them. For each
+recipient we draw $K_{\mathrm{ref}}=200$ samples from the advantaged reference
+$\hat P(W\mid x^{(1)},z_i)$. For each plan in the recipient's action set,
+which we enumerate exhaustively, we draw $K_{\mathrm{int}}=32$ samples from
+$Q_a$. Both methods select from these same candidate draws and are scored
+against the same reference draws. Validity at level $\gamma$ requires at least
+$\lceil 32\gamma\rceil$ of the 32 scores to be at or above $\tau$. Within-seed
+95\% intervals for recourse metrics are percentile-bootstrap intervals over
+recipients with $B=1000$ replicates. Paired comparisons with ordinary recourse
+resample the same recipients for both methods.
+
+\paragraph{Uncertainty reported.}
+Bootstrap intervals hold the fitted mediator model and classifier fixed, so
+they reflect instance and recipient sampling only. The main tables instead
+report the mean $\pm$ sample standard deviation over the five seeds, which
+also reflects refitting the whole pipeline. Per-seed intervals are in
+Tables~\ref{tab:app_seed_a} and~\ref{tab:app_seed_b}.
+
+\subsection{Recourse Settings}
+\label{app:exp_recourse}
+
+Both methods use the cost~\eqref{eq:cost}, the action grids and bounds of
+Table~\ref{tab:roles}, and the intervention law $Q_a$, under which
+descendants of acted mediators are redrawn and unacted coordinates in the
+acted block keep their factual values. Both also use the abstention rule of
+Section~\ref{sec:recourse_selection}. Ordinary actionable recourse returns the
+cheapest $\gamma$-valid plan. Our method returns the cheapest $\gamma$-valid
+plan with $W_1(P_a,R_{z_i})\le\varepsilon$. The main results use $\gamma=0.5$
+and $\varepsilon=0.1$ on every dataset. The sensitivity analysis re-selects
+plans from the same draws for $\gamma\in\{0.5,0.6,0.7,0.8,0.9\}$
+(Table~\ref{tab:gamma_all}). Coverage diagnostics evaluate
+$\varepsilon\in\{0.025,0.05,0.075,0.1,0.15,0.2,0.3,0.5\}$, plus $0.4$ on ACS
+(Table~\ref{tab:app_coverage}).
+
+\subsection{Mediator Model Checkpoint Selection}
+\label{app:exp_checkpoint}
+
+Every downstream quantity is a Monte Carlo average over samples from the
+mediator model, so we select checkpoints for sample fidelity and not for
+likelihood alone. After every epoch we draw mediators for a fixed subset of
+validation contexts and compare them with the observed mediators. The
+comparison uses the total variation of each categorical marginal, the
+normalized $W_1$ distance of each ordinal and each continuous mediator (each
+overall and within each group of $X$), and the largest error in the pairwise
+correlations of the continuous mediators. A checkpoint is eligible only if
+every discrepancy is below its threshold. Among eligible checkpoints we keep
+the one minimizing validation negative log-likelihood plus a weighted sum of
+the discrepancies. Law School, whose two mediators are continuous and form a
+single block, is selected on validation likelihood alone. The full procedure
+and the thresholds for each dataset are in Appendix~\ref{app:training}
+(Table~\ref{tab:flow_hparams}).
+
+\subsection{Software and Compute}
+\label{app:exp_software}
+
+All experiments use Python 3.12 with PyTorch 2.11, \texttt{nflows} 0.14,
+scikit-learn 1.8, SciPy 1.15, and NumPy 2.4. ACS data are obtained with
+\texttt{folktables}. The pipeline for one dataset and seed is run with
+\texttt{python -m evaluation.run\_multiseed}, and all tables are generated
+from its outputs.
+% TODO(author): add hardware and wall-clock time (this machine has an NVIDIA
+% RTX 5090 and 16 CPU cores; confirm these were used for the reported runs),
+% and a link to the code release.

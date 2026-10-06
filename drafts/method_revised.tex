@@ -1,0 +1,557 @@
+\section{Method}
+\label{sec:method}
+
+Our framework has four components:
+(1)~a projection of the observed features onto the Standard Fairness Model
+(SFM), which fixes the causal assumptions and the classifier-scale estimands
+they identify (Section~\ref{sec:projection});
+(2)~a block-ordered generative model of the mediators, $P(W\mid X,Z)$
+(Section~\ref{sec:flows});
+(3)~an individualized interventional distribution $Q_a$ that simulates the
+consequences of an action plan $a$ (Section~\ref{sec:intervention}); and
+(4)~a constrained recourse program that returns the cheapest plan whose
+prediction distribution is both valid and close, in Wasserstein distance, to
+the prediction distribution the recipient would receive under the advantaged
+group's mediators. If no plan satisfies both constraints, the program
+abstains (Section~\ref{sec:recourse_selection}).
+Section~\ref{sec:theory} characterizes exactly when the two constraints can
+hold simultaneously. Section~\ref{sec:evaluation} defines how we measure the
+disparity before and after recourse.
+
+% ---------------------------------------------------------------------------
+\subsection{SFM Projection and Identification}
+\label{sec:projection}
+
+Prior causal recourse methods assume a fully specified structural causal model
+over all features~\citep{karimi2021algorithmic}. We instead commit only to a
+partition of the features into causal roles and an order over groups of
+mediators. Leaving the edges within each role unspecified makes this strictly
+weaker than a full SCM, although it remains an assumption. We state it
+explicitly and separate the parts that identify the disparity from the parts
+that are needed only to simulate recourse.
+
+\begin{definition}[SFM projection]
+\label{def:sfm}
+Partition the observed variables into
+\begin{itemize}[nosep]
+  \item $X\in\{x^{(0)},x^{(1)}\}$: a binary sensitive attribute (e.g., sex),
+        with $x^{(0)}$ the disadvantaged group;
+  \item $Z$: pre-treatment covariates that are not descendants of $X$
+        (e.g., age, place of birth);
+  \item $W$: mediators, i.e., descendants of $X$ that precede the decision
+        (e.g., education, occupation, hours worked);
+  \item $Y$: the binary outcome, used only to train the classifier and to
+        identify recourse recipients.
+\end{itemize}
+A fixed classifier $\hat f:\mathcal X\times\mathcal W\times\mathcal Z\to[0,1]$
+induces the prediction $\hat Y=\hat f(X,W,Z)$, a deterministic child of
+$(X,W,Z)$, and a positive decision when $\hat f\ge\tau$. The projected graph
+$\mathcal G_{\mathrm{SFM}}$ is complete across clusters. It contains the direct
+path $X\to\hat Y$, the indirect paths $X\to W\to\hat Y$ (including chains within
+$W$), and the spurious paths $X\leftrightarrow Z\to\hat Y$ and
+$X\leftrightarrow Z\to W\to\hat Y$.
+\end{definition}
+
+\noindent For $b\in\{x^{(0)},x^{(1)}\}$, let $W_b$ denote the potential
+mediator, the value $W$ would take had $X$ been set to $b$. We write
+\begin{equation}
+  \mu_{ab}(z)\;:=\;\mathbb E\bigl[\hat f(a,W_b,z)\mid Z=z\bigr],
+  \qquad a,b\in\{x^{(0)},x^{(1)}\},
+  \label{eq:mu_ab}
+\end{equation}
+where the first index is the value of $X$ entering $\hat f$ directly and the
+second is the value of $X$ that generates the mediators.
+
+\begin{assumption}[Identification of classifier-scale effects]
+\label{ass:ident}
+(i)~$Z$ contains no descendant of $X$;
+(ii)~consistency: $W=W_b$ whenever $X=b$;
+(iii)~positivity: $P(X=b\mid z)>0$ for all $z$ and $b$;
+(iv)~no unmeasured $X$--$W$ confounding given $Z$: $W_b\perp X\mid Z$.
+\end{assumption}
+
+\noindent Under Assumption~\ref{ass:ident},
+$P(W_b\mid z)=P(W\mid X=b,z)$, so every $\mu_{ab}(z)$ is identified from the
+observational mediator distribution:
+\begin{equation}
+  \mu_{ab}(z)\;=\;\mathbb E_{W\sim P(W\mid X=b,\,z)}\bigl[\hat f(a,W,z)\bigr].
+  \label{eq:mu_id}
+\end{equation}
+Because $\hat f$ is a known function, the step $W\to\hat Y$ cannot be
+confounded. No assumption about mediator--outcome confounding or cross-world
+independence for $Y$ is needed, so the SFM's restrictions on latent $W$--$Y$
+and $X$--$Y$ confounding go unused. This is a deliberate choice of target: we
+study the disparity produced by the decision rule, which is what recourse acts
+on. Reading these quantities as effects on the true outcome $Y$ would also
+require the standard sequential-ignorability conditions, which we do not
+claim. Every estimand holds $z$ fixed, so the spurious $X$--$Z$ association is
+excluded from the mediated disparity rather than attributed to it. The
+mediated disparity is the effect of $X$ on $\hat f$ through the mediator
+\emph{set} $W$, and it includes chains within $W$. Effects through a single
+mediator would need further path-specific assumptions.
+
+\paragraph{Permitted versus assumed edges.}
+The projection allows every mediator to depend on $X$, $Z$, and earlier
+mediators, and allows $\hat f$ to depend on all of them. Allowing an edge is
+not a substantive assumption. If $X$ has no effect on some mediator block, the
+correctly specified conditional does not depend on $x$, and that block
+contributes nothing to the mediated disparity. A superfluous edge costs
+statistical efficiency, not validity. The causal content lies in the
+\emph{omitted} edges:
+$X$ and $W$ do not cause $Z$;
+there is no unmeasured $X$--$W$ confounding given $Z$;
+and, where stated, dataset-specific exclusion restrictions apply (e.g.,
+no direct edge from sex to the repayment terms (credit amount, duration) in German Credit;
+Appendix~\ref{app:roles}).
+The order among mediator blocks, which only recourse requires, is stated
+separately in Assumption~\ref{ass:intervene}.
+
+\paragraph{Role assignment.}
+The partition is fixed before any model is fit, using a stated protocol rather
+than case-by-case judgement.
+$X$ is determined by the fairness question.
+A variable is placed in $Z$ only if it is determined before $X$ could affect
+it, by temporal or biological precedence (e.g., age, place of birth).
+A variable is placed in $W$ if the domain literature identifies it as a
+consequence of $X$ that precedes the decision. Variables that fit neither role
+are excluded, and the reason is recorded (e.g., commute time in ACS).
+Which paths count as unfair is a normative choice and is stated per dataset.
+Appendix~\ref{app:roles} lists the role of every variable with a one-line
+justification. The most damaging misassignment places a pre-treatment
+variable that is confounded with $X$ into $W$: its spurious association with
+$X$ would then be counted as mediated disparity. The precedence criterion for
+$Z$ guards against exactly this error. A variable unrelated to $X$ placed in
+$W$ is harmless, since no mediated effect flows through it. Finally, the
+semi-synthetic German Credit benchmark satisfies Assumptions~\ref{ass:ident}
+and~\ref{ass:intervene} by construction and has known oracle effects, which
+lets us check the pipeline when the projection is correct.
+
+Actionability, i.e., which coordinates of $W$ an individual can change and in
+which direction, is a property of the recourse problem, not of the causal
+model. We specify it in Section~\ref{sec:intervention}.
+
+% ---------------------------------------------------------------------------
+\subsection{Normalizing Flow Estimation of $P(W\mid X,Z)$}
+\label{sec:flows}
+
+The nested counterfactual predictions in~\eqref{eq:mu_id} and the recourse
+program (Section~\ref{sec:recourse_selection}) both require sampling from
+$P(W\mid X,Z)$, and recourse additionally requires simulating interventions on
+$W$. Mediators may be continuous, ordinal, or categorical, and the SFM itself
+imposes no order among them, treating $W$ as an unordered set. Some mediators
+have a defensible causal order (education precedes occupation), whereas others
+are determined jointly and have none (weekly hours and weeks worked; LSAT and
+GPA). We therefore partition $W$ into type-homogeneous \emph{blocks}
+$W=(W_1,\ldots,W_L)$, ordered between blocks but unordered within them, and
+factorize
+\begin{equation}
+  P(W\mid X,Z)\;=\;\prod_{\ell=1}^{L} P\bigl(W_\ell\mid W_{<\ell},X,Z\bigr).
+  \label{eq:block_fact}
+\end{equation}
+In every dataset we consider, the continuous mediators form a single block
+placed last, so~\eqref{eq:block_fact} takes the form
+\begin{equation}
+  P(W\mid X,Z)=
+  \underbrace{\prod_{\ell\in\mathcal L_{\mathrm{disc}}}
+     P\bigl(W_\ell\mid W_{<\ell},X,Z\bigr)}_{P(W_{\mathrm{disc}}\mid X,Z)}
+  \;P\bigl(W_{\mathrm{cont}}\mid W_{\mathrm{disc}},X,Z\bigr).
+  \label{eq:cond_fact}
+\end{equation}
+For ACS, for example, the blocks are
+$[\textsc{Educ}]\to[\textsc{Occ}]\to[\textsc{Hours},\textsc{Weeks}]$
+(Figure~\ref{fig:block_model}). Placing the discrete blocks upstream of the
+continuous one is a substantive ordering claim, made per dataset in
+Appendix~\ref{app:roles}, not a convention: it matters for interventions, as
+discussed below.
+
+\paragraph{Discrete blocks.}
+Each discrete block is modelled by a neural categorical head $g_\phi$ whose
+class probabilities depend on $(x,z)$ and on all earlier blocks. Within a block
+with several discrete coordinates, the heads are factorized
+autoregressively. This is a statistical parameterization of the joint block
+distribution and adds no causal edges.
+
+\paragraph{Continuous block.}
+The continuous block is modelled by a conditional normalizing flow $f_\theta$
+with rational-quadratic spline transforms~\citep{durkan2019neural}, which
+captures the joint dependence among continuous mediators without imposing an
+order on them. Let $h=[\mathrm{emb}(w_{\mathrm{disc}});\,x;\,\tilde z]$ be the
+conditioning vector, where $\mathrm{emb}(\cdot)$ embeds the discrete mediators
+and $\tilde z$ is $z$ standardized with training-split statistics. With
+$w_{\mathrm{cont}}=f_\theta(u;h)$ and $u\sim\mathcal N(0,I)$,
+\begin{equation}
+  \log p_\theta(w_{\mathrm{cont}}\mid w_{\mathrm{disc}},x,z)
+  =\log\mathcal N\!\bigl(f_\theta^{-1}(w_{\mathrm{cont}};h);0,I\bigr)
+  +\log\Bigl|\det\frac{\partial f_\theta^{-1}}{\partial w_{\mathrm{cont}}}\Bigr|.
+  \label{eq:flow_loglik}
+\end{equation}
+The coordinate order inside the flow is a density parameterization and carries
+no causal meaning. When a dataset's graph excludes a direct effect of $X$ on
+the continuous block, we drop $x$ from $h$. Both factors are trained jointly by
+maximizing
+\begin{equation}
+  \max_{\phi,\theta}\;\frac1n\sum_{i=1}^n\Bigl[
+    \sum_{\ell\in\mathcal L_{\mathrm{disc}}}
+      \log p_\phi\bigl(w_{\ell,i}\mid w_{<\ell,i},x_i,z_i\bigr)
+    +\log p_\theta\bigl(w_{\mathrm{cont},i}\mid w_{\mathrm{disc},i},x_i,z_i\bigr)
+  \Bigr].
+  \label{eq:flow_training}
+\end{equation}
+Because every downstream quantity is a Monte Carlo average over model samples,
+we select checkpoints by posterior-predictive fidelity on the validation split
+rather than by likelihood alone (Appendix~\ref{app:training}).
+
+\paragraph{Monte Carlo estimation.}
+Sampling is ancestral: discrete blocks are drawn in order from $g_\phi$, and
+$w_{\mathrm{cont}}=f_\theta(u;h)$ is then computed from a fresh
+$u\sim\mathcal N(0,I)$. Each nested counterfactual prediction is estimated by
+sampling directly from the mediator law of its mediator arm,
+\begin{equation}
+  \hat\mu_{ab}(z)=\frac1K\sum_{k=1}^{K}\hat f\bigl(a,w^{(k)}_b,z\bigr),
+  \qquad w^{(k)}_b\sim\hat P(W\mid X=b,z),
+  \label{eq:mu_mc}
+\end{equation}
+and $\widehat\NDE$ and $\widehat\NIE$ follow by plugging
+$\hat\mu_{ab}$ into~\eqref{eq:effects}. We draw separate samples for each
+$b$ rather than reweighting samples from one group with importance ratios
+$\hat p(w\mid x^{(1)},z)/\hat p(w\mid x^{(0)},z)$, whose variance is large when
+the two group-conditional laws overlap poorly. We use
+$K=500$ Monte Carlo samples per instance and report percentile-bootstrap
+intervals over instances with $B=2000$ replicates. These intervals hold the
+fitted mediator model and classifier fixed. Full-pipeline uncertainty is
+assessed separately across seeds (Section~\ref{sec:experiments}).
+
+\paragraph{The block order matters only for recourse.}
+By the chain rule, any block order represents the same joint distribution
+$P(W\mid X,Z)$. The estimands $\mu_{ab}(z)$, and the advantaged reference
+$R_z$ used below, therefore do not depend on the order, up to estimation
+error, and need only Assumption~\ref{ass:ident}. The order matters only when
+we \emph{intervene} on a mediator and regenerate its consequences, which
+requires the following stronger assumption.
+
+\begin{assumption}[Interventional validity of the block model]
+\label{ass:intervene}
+(i)~The blocks follow a valid topological order: no block causes an earlier
+block.
+(ii)~Modularity: each mechanism $P(W_\ell\mid W_{<\ell},X,Z)$ is unchanged when
+earlier blocks are intervened on.
+(iii)~There is no unmeasured confounding between mediator blocks given
+$(X,Z)$.
+(iv)~Intervened values lie within the observed support of $W$.
+\end{assumption}
+
+\noindent Assumption~\ref{ass:intervene} is the strongest assumption in the
+framework, and only the recourse step uses it. The pre-recourse disparity
+needs Assumption~\ref{ass:ident} alone.
+
+% ---------------------------------------------------------------------------
+\subsection{Interventional Recourse Distribution}
+\label{sec:intervention}
+
+\paragraph{Recipients and actionability.}
+Recourse is offered to disadvantaged-group true negatives: instances
+$(x^{(0)},w_0,z)$ with $y=0$ and $\hat f(x^{(0)},w_0,z)<\tau$. The values of $X$
+and $Z$ are never changed. Each mediator $j$ is assigned an actionability type
+that says in which direction an individual can change it:
+\emph{fixed} (cannot be changed), \emph{monotone-up} (can only increase, e.g.,
+education or hours worked), \emph{monotone-down} (can only decrease), or
+\emph{free} (can move in either direction, e.g., occupation). The type
+determines the set $\mathcal G_j(w_{0j})$ of values the mediator may take from
+its factual value $w_{0j}$. For a discrete mediator, $\mathcal G_j$ contains
+the factual category and, for monotone-up, every higher category in its
+natural order, or, for free, every category. For a continuous mediator,
+$\mathcal G_j$ is a grid with a fixed step between the factual value and a
+plausible bound, in the permitted direction (e.g., weekly hours in steps of
+5 up to 60). Every grid contains $w_{0j}$, so leaving a mediator unchanged is
+always allowed. Appendix~\ref{app:roles} lists each mediator's type, step,
+and bounds. An action plan is a target vector
+$a=w'\in\mathcal A(w_0):=\prod_j\mathcal G_j(w_{0j})$. Its acted set is
+$S(a)=\{j:w'_j\ne w_{0j}\}$, and $\ell^*(a)$ is the earliest block containing
+an acted coordinate.
+
+\paragraph{Interventional distribution.}
+An action changes the acted mediators and, through the block mechanisms, the
+mediators downstream of them. We represent this as a distribution rather than
+a point. Let $Q_a(\cdot\mid w_0,x^{(0)},z)$ be the law of $W$ generated as
+follows:
+\begin{enumerate}[nosep]
+  \item blocks before $\ell^*(a)$ keep their factual values;
+  \item acted coordinates are clamped, $W_j=w'_j$ for $j\in S(a)$;
+  \item unacted coordinates in block $\ell^*(a)$ keep their factual values;
+  \item every block after $\ell^*(a)$ is redrawn in order from the learned
+        mechanism $\hat P(W_\ell\mid W_{<\ell},x^{(0)},z)$, and acted coordinates
+        in that block keep their clamped values.
+\end{enumerate}
+If $S(a)=\emptyset$, then $Q_a=\delta_{w_0}$. Step~4 regenerates every later
+block, not only the true graph descendants of the acted coordinates. This is
+conservative and consistent with Assumption~\ref{ass:intervene}: if a later
+block does not depend on the acted one, the learned mechanism should reflect
+that, and the only cost is added variance. Step~3 resolves the one semantic
+choice that blocks introduce. With no causal order inside a block, acting on
+one coordinate gives no reason to change the others, so they keep the
+individual's values. (Appendix~\ref{app:training} reports a variant in which
+they are redrawn from their conditional marginal.)
+
+$Q_a$ is an individualized \emph{interventional} distribution, not a
+unit-level counterfactual. We do not abduct exogenous noise, which is not
+identifiable for discrete mediators in any case. This follows the
+probabilistic view of recourse under imperfect causal
+knowledge~\citep{karimi2020imperfect}, and it is why recourse is evaluated over
+a distribution of outcomes rather than at a single point.
+
+\paragraph{Prediction distributions.}
+Write $\hat f_0(w,z):=\hat f(x^{(0)},w,z)$. For a plan $a$, let
+\begin{equation}
+  P_a\;:=\;\mathrm{Law}\bigl(\hat f_0(W,z)\bigr),\quad W\sim Q_a(\cdot\mid w_0,x^{(0)},z),
+  \label{eq:plan_law}
+\end{equation}
+be the distribution of the recipient's predicted score after acting. Let the
+\emph{advantaged reference} be
+\begin{equation}
+  R_z\;:=\;\mathrm{Law}\bigl(\hat f_0(W,z)\bigr),\quad W\sim P(W\mid X=x^{(1)},z),
+  \qquad
+  \mu_{\mathrm{ref}}(z):=\mathbb E[R_z]=\mu_{x^{(0)}x^{(1)}}(z).
+  \label{eq:reference}
+\end{equation}
+$R_z$ is the score distribution the recipient would receive if their mediators
+were distributed as those of advantaged individuals with the same $z$. Both
+$P_a$ and $R_z$ hold $X$ at $x^{(0)}$ inside $\hat f$, so they differ only
+through the mediators: comparing them isolates the mediated pathway and leaves
+the direct effect of $X$ untouched. $R_z$ is a population-level counterpart
+conditioned on $z$, whereas $Q_a$ retains the recipient's factual
+non-descendants. The comparison is therefore between a partly individual
+distribution and a $z$-conditional population distribution.
+
+% ---------------------------------------------------------------------------
+\subsection{Distribution-Constrained Recourse}
+\label{sec:recourse_selection}
+
+\paragraph{Recourse cost.}
+The cost of a plan $a=w'$ is
+\begin{equation}
+  c(a)=\sum_{j\in W_{\mathrm{cont}}}\alpha_j\,(w'_j-w_{0j})^2
+  +\sum_{j\in W_{\mathrm{disc}}}\alpha_j\,\mathbf 1\{w'_j\ne w_{0j}\},
+  \qquad
+  \alpha_j=\begin{cases}
+    1/\hat\sigma_j^2 & j\in W_{\mathrm{cont}},\\
+    1/H_j & j\in W_{\mathrm{disc}},
+  \end{cases}
+  \label{eq:cost}
+\end{equation}
+where $\hat\sigma^2_j$ is the empirical variance of continuous mediator $j$
+and $H_j=-\sum_k\hat p_{jk}\log\hat p_{jk}$ is the empirical entropy of discrete
+mediator $j$, both computed on the training split. The continuous term is a
+squared change in standard-deviation units. The discrete term makes changes to
+widely spread mediators cheaper than changes to concentrated ones.
+
+\paragraph{Constrained program.}
+A plan is \emph{$\gamma$-valid} if it yields a positive decision with
+probability at least $\gamma$, i.e., $P_a([\tau,1])\ge\gamma$. Our method
+solves
+\begin{equation}
+  a^*\in\arg\min_{a\in\mathcal A(w_0)}\;c(a)
+  \quad\text{s.t.}\quad
+  \underbrace{P_a([\tau,1])\ge\gamma}_{\text{validity}},
+  \qquad
+  \underbrace{W_1(P_a,R_z)\le\varepsilon}_{\text{distributional parity}},
+  \label{eq:program}
+\end{equation}
+where $W_1$ is the 1-Wasserstein distance on $[0,1]$. If the feasible set is
+empty, the method \emph{abstains}: the recipient receives the zero-cost
+factual plan $a=w_0$ and the abstention is recorded. Abstaining recipients
+stay in every evaluation average, so difficult cases are never silently
+dropped.
+
+Validity alone asks that the recipient \emph{cross} the decision boundary. The
+parity constraint asks that the recipient's score distribution \emph{land
+where their advantaged counterpart's would be}. It penalizes undershooting
+(valid, but still scored below the reference) as well as overshooting (pushed
+further than the reference). Placing the Wasserstein constraint in prediction
+space has two advantages. First, $\hat f_0$ maps both mediator distributions to
+$[0,1]$, so we need no metric over mixed continuous and categorical
+mediators, and no Lipschitz assumption on $\hat f$ over categorical codes.
+Second, in one dimension $W_1$ has the closed form
+$W_1(G,R)=\int_0^1|G^{-1}(u)-R^{-1}(u)|\,du$, which yields the exact analysis
+in Section~\ref{sec:theory}.
+
+\paragraph{Baseline.}
+The baseline, \emph{ordinary actionable recourse}, solves~\eqref{eq:program}
+without the parity constraint. We deliberately make it as strong as we can,
+so that the comparison is the hardest one for our method rather than a
+comparison against a straw man. Actionable recourse as usually
+formulated~\citep{ustun2019actionable} changes features directly, treats them
+as independently manipulable, and checks validity at a single point. Our
+baseline instead inherits every component of our method except the parity
+constraint:
+(i)~the same action space, restricted to the mediators with the same
+actionability types and grids;
+(ii)~the same causal intervention model $Q_a$, so downstream consequences of
+an action are propagated through the learned block mechanisms rather than
+ignored~\citep{karimi2021algorithmic};
+(iii)~the same probabilistic notion of validity, $P_a([\tau,1])\ge\gamma$,
+evaluated over the same interventional draws;
+(iv)~the same cost~\eqref{eq:cost}; and
+(v)~the same abstention rule.
+Both methods also select from identical candidate and reference draws, so
+neither benefits from Monte Carlo noise. Any difference between them is
+therefore due to the parity constraint alone. In
+Section~\ref{sec:exp_gamma} we go one step further and give the baseline its
+best validity level, chosen after the fact on the evaluation recipients,
+while our method keeps a fixed $\gamma$.
+
+\paragraph{Estimation.}
+For each recipient we enumerate $\mathcal A(w_0)$ in full. For each plan we draw
+$K_{\mathrm{int}}$ samples from $Q_a$ and estimate validity as the fraction of
+scores at or above $\tau$. We also draw $K_{\mathrm{ref}}$ samples from
+$\hat P(W\mid x^{(1)},z)$ to form the empirical reference, and we evaluate
+$W_1$ between the two empirical score distributions. The guarantees of
+Section~\ref{sec:theory} hold exactly for these empirical distributions. The
+empirical $W_1$ is biased upward at rate $O(K^{-1/2})$, so $\varepsilon$ should
+be set above the Monte Carlo noise level. We use $\gamma=0.5$, $\varepsilon=0.1$,
+$K_{\mathrm{int}}=32$, and $K_{\mathrm{ref}}=200$, and we vary $\gamma$ in
+Section~\ref{sec:exp_gamma}.
+Appendix~\ref{app:soft} describes a soft penalized objective (cost plus
+weighted shortfall, pointwise direct-effect, and transport terms) that the
+ablations in Section~\ref{sec:experiments} compare against.
+
+% ---------------------------------------------------------------------------
+\subsection{When Are Validity and Distributional Parity Compatible?}
+\label{sec:theory}
+
+The two constraints in~\eqref{eq:program} can conflict: if the advantaged
+reference itself rarely clears the threshold, any sufficiently valid plan must
+move the recipient \emph{beyond} it. The following result makes this conflict
+precise.
+
+\begin{theorem}{Validity--Parity Tradeoff}{val-par}
+Fix a recipient with covariates $z$ and factual mediators $w_0$, and define
+\[
+\varepsilon_\gamma(z)
+:=
+\inf_{G:\,G([\tau,1])\ge\gamma}
+W_1(G,R_z)
+\]
+as the smallest distributional parity gap attainable by any score distribution satisfying the validity requirement. We define the admissible action set as follows:
+
+\[
+\varepsilon_{\mathcal A}(z,w_0)
+:=
+\min_{\substack{a\in\mathcal A(w_0):\\P_a([\tau,1])\ge\gamma}}
+W_1(P_a,R_z),
+\]
+
+with $\varepsilon_{\mathcal A}(z,w_0)=+\infty$ if no $\gamma$-valid action exists. Then
+\begin{equation}
+\varepsilon_{\mathcal A}(z,w_0)
+\ge
+\varepsilon_\gamma(z).
+\label{eq:feasibility_bound}
+\end{equation}
+
+Hence, validity imposes an irreducible lower bound on attainable distributional parity. Therefore, the recourse program is feasible only when the following bound holds:
+
+\[
+\varepsilon
+\ge
+\varepsilon_{\mathcal A}(z,w_0)
+\ge
+\varepsilon_\gamma(z).
+\]
+
+When the program yields a feasible action, its solution satisfies the following bound over the remaining parity gap:
+
+\[
+W_1(P_{a^\ast},R_z)\le\varepsilon,
+\]
+ Moreover, $\varepsilon_\gamma(z)=0$ if and only if the reference distribution itself satisfies $R_z([\tau,1])\ge\gamma$.
+\end{theorem}
+
+\noindent The proof is in Appendix~\ref{app:theory}, which also shows that
+the infimum defining $\varepsilon_\gamma(z)$ is attained and has the closed form
+$\varepsilon_\gamma(z)=\int_{1-\gamma}^{1}(\tau-F_{R_z}^{-1}(u))_+\,du$, where
+$F_{R_z}^{-1}$ is the quantile function of $R_z$. It can therefore be computed
+exactly from samples of $R_z$, and it depends only on $\hat f$, the advantaged
+mediator distribution at $z$, and $(\tau,\gamma)$, not on the action set or
+the cost.
+
+By~\eqref{eq:feasibility_bound}, every abstention has exactly one of three
+causes:
+(a)~\emph{no recourse}: no $\gamma$-valid plan exists;
+(b)~\emph{target incompatibility}: $\varepsilon<\varepsilon_\gamma(z)$, a
+property of $\hat f$, $P(W\mid x^{(1)},z)$, and $\gamma$ alone; or
+(c)~\emph{unreachability}: $\varepsilon_\gamma(z)\le\varepsilon<
+\varepsilon_{\mathcal A}(z,w_0)$, a property of the action set and the
+mechanisms.
+Appendix~\ref{app:theory} proves two further consequences. First, every
+$\gamma$-valid plan has $\mathbb E[P_a]\ge\gamma\tau$, so when
+$\mu_{\mathrm{ref}}(z)<\gamma\tau$ validity alone forces every plan, including
+ordinary recourse, to overshoot the reference
+(Proposition~\ref{prop:overshoot}). Second, since feasible recipients satisfy
+$|D_{\mathrm{post},i}|\le\varepsilon$ and abstaining recipients keep their
+factual disparity, closure is limited by the abstention rate
+(Proposition~\ref{prop:guarantee}), and (a)--(c) explain what drives
+abstention.
+
+% ---------------------------------------------------------------------------
+\subsection{Estimands and Evaluation}
+\label{sec:evaluation}
+
+\paragraph{Pre-recourse decomposition.}
+On the classifier scale, using~\eqref{eq:mu_ab}, we report the pure natural
+direct and indirect effects,
+\begin{equation}
+  \NDE(z)=\mu_{10}(z)-\mu_{00}(z),\qquad
+  \NIE(z)=\mu_{01}(z)-\mu_{00}(z),
+  \label{eq:effects}
+\end{equation}
+where indices $0,1$ abbreviate $x^{(0)},x^{(1)}$, estimated
+via~\eqref{eq:mu_mc} and averaged over held-out instances.
+
+Both $P_a$ and $R_z$ fix $X=x^{(0)}$ inside $\hat f$, so recourse on $W$ can at
+most close the mediated part of the disparity, the $\NIE$. The $\NDE$ is
+carried along $X\to\hat Y$ and no mediator-based recourse can reach it.
+
+\paragraph{Mediated disparity before and after recourse.}
+For recipient $i$ with confounders $z_i$, we define
+\begin{align}
+  D_{\mathrm{pre},i}&:=\mu_{\mathrm{ref}}(z_i)-\mu_{00}(z_i)=\NIE(z_i),
+  \label{eq:dpre}\\
+  D^{\mathrm{fact}}_{\mathrm{pre},i}&:=\mu_{\mathrm{ref}}(z_i)-\hat f_0(w_{0,i},z_i),
+  \label{eq:dpre_fact}\\
+  D_{\mathrm{post},i}&:=\mu_{\mathrm{ref}}(z_i)-\mathbb E\bigl[P_{a^*_i}\bigr].
+  \label{eq:dpost}
+\end{align}
+$D_{\mathrm{pre}}$ compares the reference with the disadvantaged group's natural
+mediator distribution. $D^{\mathrm{fact}}_{\mathrm{pre}}$ compares it with the
+recipient's own factual score, the natural baseline for an individual
+intervention. $D_{\mathrm{post}}$ compares a natural distribution with an
+\emph{intervened} one, so it is not a natural indirect effect, and we do not
+call it one. The reference is never itself passed through recourse.
+
+\paragraph{Metrics.}
+Our primary metric is recipient-level closure,
+\begin{equation}
+  \mathrm{Closure}\;=\;1-\frac{\sum_i|D_{\mathrm{post},i}|}
+                             {\sum_i|D^{\mathrm{fact}}_{\mathrm{pre},i}|},
+  \label{eq:closure}
+\end{equation}
+computed from absolute values per recipient so that positive and negative
+gaps cannot cancel. We also report:
+the overshoot rate, $\Pr[D_{\mathrm{post},i}<0]$, and the mean overshoot size;
+the paired improvement over the baseline,
+$|D^{\mathrm{base}}_{\mathrm{post},i}|-|D_{\mathrm{post},i}|$;
+the abstention rate;
+and the mean recourse cost among feasible recipients.
+
+\paragraph{Compatibility diagnostics.}
+To tell \emph{no recourse exists} apart from \emph{the targets conflict}, we
+report, per dataset and classifier:
+the share of recipients whose reference is itself $\gamma$-valid, i.e.,
+$\varepsilon_\gamma(z)=0$;
+the distribution of $\varepsilon_\gamma(z)$ and of
+$\mu_{\mathrm{ref}}(z)-\gamma\tau$;
+the distribution of $\varepsilon_{\mathcal A}(z,w_0)$, whose empirical CDF gives
+coverage as a function of $\varepsilon$;
+and the breakdown of abstentions into causes~(a)--(c).
+All four are computed from the same empirical score distributions used to
+solve~\eqref{eq:program}.

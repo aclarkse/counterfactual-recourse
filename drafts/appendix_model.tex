@@ -1,0 +1,337 @@
+\section{Mediator Model Details}
+\label{app:training}
+
+\subsection{Block Structure and Training}
+\label{app:block_training}
+
+\paragraph{Factorization.}
+For each dataset the mediators are partitioned into the blocks of
+Table~\ref{tab:roles}, and the mediator model is the product of one factor
+per block~\eqref{eq:block_fact}. Table~\ref{tab:factors} lists the factors.
+Every discrete mediator has its own categorical head $g_\phi$, and the
+continuous mediators, which always form a single block placed last, share
+one conditional flow $f_\theta$. Each factor conditions on $x$, on $z$, and on
+\emph{all} mediators in earlier blocks, not only on the block immediately
+before it. In German-Synth this is a superset of the true parents (for
+example, savings depends on education only through job in the SCM), so the
+true mechanisms remain within the model class. No factor conditions on a
+mediator in its own block or in a later one. In the datasets used here every
+discrete block contains a single mediator, so no within-block factorization of
+categorical mediators is needed.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Factors of the mediator model, in sampling order. ``Head'' is a
+categorical network $g_\phi$ and ``Flow'' the conditional spline flow
+$f_\theta$. Inputs list what each factor conditions on: $e(\cdot)$ is a
+learned 4-dimensional embedding of a discrete mediator, and $\tilde z$ is $z$
+with the listed continuous confounders standardized by training-split
+statistics (binary confounders enter as 0/1).}
+\label{tab:factors}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llll}
+\hline
+Dataset & Factor & Model & Inputs \\
+\hline
+German-Synth & $P(\textsc{Educ}\mid x,z)$ & Head (4 classes) & $x,\tilde z$ \\
+ & $P(\textsc{Job}\mid \textsc{Educ},x,z)$ & Head (4) & $x,\tilde z,e(\textsc{Educ})$ \\
+ & $P(\textsc{Savings}\mid \textsc{Educ},\textsc{Job},x,z)$ & Head (4) & $x,\tilde z,e(\textsc{Educ}),e(\textsc{Job})$ \\
+ & $P(\textsc{Amount},\textsc{Duration}\mid w_{\mathrm{disc}},z)$ & Flow (2-dim) & $\tilde z,e(\textsc{Educ}),e(\textsc{Job}),e(\textsc{Savings})$ \\
+ & \multicolumn{3}{l}{\quad $\tilde z$: age standardized. The flow omits $x$: the SCM has no edge from $X$ to amount or duration.} \\
+\hline
+Law School & $P(\textsc{LSAT},\textsc{GPA}\mid x,z)$ & Flow (2-dim) & $x,z$ \\
+ & \multicolumn{3}{l}{\quad $z$ = (gender, family-income code 1--5), entered unstandardized.} \\
+\hline
+ACS Income & $P(\textsc{Educ}\mid x,z)$ & Head (6) & $x,\tilde z$ \\
+ & $P(\textsc{Occ}\mid \textsc{Educ},x,z)$ & Head (10) & $x,\tilde z,e(\textsc{Educ})$ \\
+ & $P(\textsc{Hours},\textsc{Weeks}\mid w_{\mathrm{disc}},x,z)$ & Flow (2-dim) & $x,\tilde z,e(\textsc{Educ}),e(\textsc{Occ})$ \\
+ & \multicolumn{3}{l}{\quad $\tilde z$: age standardized, US-born binary.} \\
+\hline
+Adult & $P(\textsc{Educ}\mid x,z)$ & Head (6) & $x,\tilde z$ \\
+ & $P(\textsc{Occ}\mid \textsc{Educ},x,z)$ & Head (14) & $x,\tilde z,e(\textsc{Educ})$ \\
+ & $P(\textsc{HoursBin}\mid \textsc{Educ},\textsc{Occ},x,z)$ & Head (8) & $x,\tilde z,e(\textsc{Educ}),e(\textsc{Occ})$ \\
+ & \multicolumn{3}{l}{\quad $\tilde z$: age standardized, US-born binary. No continuous block, so no flow.} \\
+\hline
+\end{tabular}
+\end{table*}
+
+\paragraph{Discrete heads.}
+Each head is a two-layer ReLU network with 64 units per layer, followed by a
+linear layer that outputs one logit per category. Its input is the
+concatenation of $x$, $\tilde z$, and the embeddings of its parent mediators.
+The heads share one embedding table per discrete mediator, so a mediator has
+the same embedding in every head that conditions on it. Categorical mediators are modelled as
+unordered classes, including those that are ordinal, such as education and
+hours bins. Ordinality enters only through the posterior-predictive gates
+below.
+
+\paragraph{Continuous block.}
+Before training, each continuous mediator is mapped to a standard normal
+marginal by a quantile transform (1{,}000 quantiles) fitted on the training
+split. In ACS, hours and weeks are clipped to $[1,60]$ and $[1,52]$ first.
+The flow is a stack of masked autoregressive rational-quadratic spline
+transforms~\citep{durkan2019neural}, with a random permutation between
+successive transforms and a standard normal base distribution
+(architecture in Table~\ref{tab:flow_hparams}). Its context vector
+$h=[e(w_{\mathrm{disc}});x;\tilde z]$ is passed to every conditioner, and the
+flow has its own embedding tables for the discrete mediators. The
+autoregressive order inside the flow is a density parameterization with no
+causal meaning (Section~\ref{sec:flows}).
+
+\paragraph{Training objective.}
+All heads and the flow are trained jointly by minimizing the negative
+log-likelihood~\eqref{eq:flow_training} on the training split. This is the sum
+of one cross-entropy term per discrete head and the flow's negative
+log-density. Each head is trained on the \emph{observed} values of its parent
+mediators (teacher forcing), and the flow on the observed discrete mediators.
+Apart from the shared embeddings of the heads, the factors have no
+parameters in common, and the heads and the flow share none. The flow's log-density is measured in the quantile-transformed space, so reported
+validation NLLs are not in natural units and are not comparable across
+datasets.
+
+\paragraph{Optimization.}
+We use Adam with learning rate $10^{-3}$ and mini-batches of 256 rows,
+reshuffled every epoch. The gradient norm over all parameters is clipped at 1.
+After each epoch we compute the validation NLL and halve the learning rate
+after 5 epochs without improvement in it. Where posterior-predictive gates are
+configured, we also compute the gate discrepancies on a fixed subset of
+validation contexts (see \emph{Checkpoint selection} below).
+We keep the eligible checkpoint with the lowest selection score. Training
+stops after the configured number of epochs without improvement in that
+score, counted from the first eligible checkpoint, or at the epoch cap
+(Table~\ref{tab:flow_hparams}). Law School has no gates, so every epoch is
+eligible and its selection score is the validation NLL. The seed fixes the
+PyTorch and NumPy random states, so it fixes initialization, batch order, and
+the posterior-predictive draws. Models are trained on a GPU when one is
+available.
+
+\paragraph{Sampling and interventions.}
+Observational samples are drawn ancestrally in the order of
+Table~\ref{tab:factors}. Each head samples from its softmax given the
+already-sampled parents, and the flow transforms a fresh standard normal draw
+given the sampled discrete mediators. Continuous samples are then mapped back
+to natural units with the inverse quantile transform. Interventional samples
+from $Q_a$ use the same factors (Section~\ref{sec:intervention}):
+\begin{itemize}[nosep]
+  \item directly acted-on mediators are clamped to their action values;
+  \item mediators in blocks before the earliest acted block keep their factual
+        values;
+  \item mediators in later blocks are redrawn from their factors, conditioned
+        on the clamped and redrawn values;
+  \item unacted mediators in an acted block keep their factual values.
+\end{itemize}
+Because Law School has a single block, every plan clamps or keeps each
+mediator, and $Q_a$ is a point mass.
+
+\subsection{Implementation}
+\label{app:implementation}
+
+\paragraph{Software.}
+The mediator model is implemented in PyTorch~\citep{paszke2019pytorch}. The
+continuous block uses the conditional
+\texttt{MaskedPiecewiseRationalQuadraticAutoregressiveTransform} from
+\texttt{nflows} 0.14~\citep{nflows}, with linear tails, residual MADE
+conditioners, random permutations between layers (when the block has more
+than one coordinate), and a standard normal base distribution. The
+conditioning vector is the concatenation of the discrete-mediator embeddings,
+$x$, and the standardized $z$. Following the stated graph, German-Synth drops
+$x$ from it (Section~\ref{sec:flows}). Continuous mediators are passed through
+a scikit-learn \texttt{QuantileTransformer} with a normal output distribution,
+fitted on the training split. The flow is trained in that space, and samples
+are inverse-transformed to natural units before they are scored. Classifiers,
+quantile transforms, and the one-dimensional Wasserstein distance
+(\texttt{scipy.stats.wasserstein\_distance}) use scikit-learn and SciPy.
+
+\paragraph{Numerical safeguard.}
+In float32, the analytic inverse of a rational-quadratic spline can very
+rarely produce a slightly negative discriminant, which \texttt{nflows}
+rejects. When this happens inside a Monte Carlo batch, we split the batch
+recursively and redraw only the affected rows, allowing at most eight redraws
+per row before raising an error. No run reached that limit.
+% TODO(author): confirm "no run reached that limit" from the logs, or drop
+% the sentence.
+
+\paragraph{Checkpoint selection.}
+After every epoch we evaluate the posterior-predictive discrepancies of
+Section~\ref{sec:exp_design} on a fixed random subset of validation contexts.
+For each context the full mediator vector is drawn ancestrally with the
+context's own $(x,z)$. Discrepancies are computed overall and, for groups of
+$X$ with at least the stated minimum number of validation rows, within each
+group:
+\begin{itemize}[nosep]
+  \item total variation between generated and observed marginals of each
+        categorical mediator;
+  \item for mediators declared ordinal, $W_1$ between category codes divided
+        by the number of categories minus one;
+  \item for each continuous mediator, $W_1$ approximated on 101 quantiles,
+        divided by the observed standard deviation (in the quantile-transformed
+        space);
+  \item the largest absolute difference between generated and observed
+        pairwise correlations of the continuous mediators.
+\end{itemize}
+Each gated quantity is the maximum over mediators (and groups). A checkpoint
+is eligible if all gated quantities are at or below their thresholds. Its
+selection score is the validation negative log-likelihood plus the
+score weight times the sum of the gated quantities. The selected checkpoint
+minimizes this score among eligible checkpoints. The patience counter for
+early stopping starts only once an eligible checkpoint exists, and training
+fails if none is ever eligible. Joint total variation over all categorical
+mediators is logged but not gated, since sparse joint tables have large
+finite-sample variation.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Mediator model architecture, optimization, and
+posterior-predictive gates. ``--'' means not applicable (no mediator of that
+type) or not gated. Every run uses Adam with learning rate $10^{-3}$, halved
+after 5 epochs without improvement in validation NLL, gradient-norm clipping
+at 1, 8 spline bins, tail bound 3, two residual MADE blocks per flow layer,
+and 4-dimensional category embeddings.}
+\label{tab:flow_hparams}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\hline
+& German-Synth & Law School & ACS & Adult \\
+\hline
+Flow layers / hidden units          & 3 / 64 & 4 / 64 & 4 / 64 & -- \\
+Discrete heads (layers $\times$ units) & $2\times64$ & -- & $2\times64$ & $2\times64$ \\
+$x$ in flow conditioner             & no & yes & yes & -- \\
+Batch size / max epochs / patience  & 256 / 200 / 20 & 256 / 100 / 10 & 256 / 100 / 10 & 256 / 100 / 10 \\
+Selected epoch (mean $\pm$ SD)      & 18.0 $\pm$ 3.4 & 96.6 $\pm$ 3.4 & 53.4 $\pm$ 26.7 & 16.4 $\pm$ 3.1 \\
+\hline
+PPC contexts / draws per context    & 2{,}000 / 16 & -- & 4{,}096 / 8 & 4{,}096 / 8 \\
+Min.\ rows per group                & 200 & -- & 200 & 200 \\
+Max marginal TV (overall / group)   & .08 / .12 & -- & .075 / .10 & .075 / .10 \\
+Max ordinal $W_1$                   & .12 & -- & -- & .08 \\
+Ordinal mediators                   & Educ, Job, Savings & -- & -- & HoursBin \\
+Max continuous $W_1$ (overall / group) & .15 / .30 & -- & .12 / .30 & -- \\
+Max correlation error               & .15 & -- & .10 & -- \\
+Score weight                        & 1.0 & -- & 1.0 & 2.0 \\
+\hline
+\end{tabular}
+\end{table}
+% TODO(author): Law School's selected epoch (96.6 of a 100-epoch cap) suggests
+% training ended at the cap rather than by early stopping; consider raising
+% max_epochs or noting it.
+
+% TODO: the main text (Section~\ref{sec:intervention}) points here for the
+% same-level variant that redraws unacted coordinates of the acted block
+% (same_level_semantics=resample_marginal); add its results here.
+
+\section{Additional Results}
+\label{app:results}
+
+\paragraph{Sensitivity to the validity level.}
+Table~\ref{tab:gamma_all} reports the $\gamma$ sweep of
+Section~\ref{sec:exp_gamma} for German-Synth, Law School, and Adult. Law
+School does not change with $\gamma$ because each plan's interventional score
+distribution is a point mass. Raw per-seed values are in
+\texttt{outputs/multiseed/gamma\_sensitivity.md}.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Sensitivity to the validity level $\gamma$ ($\varepsilon=0.1$) on the
+remaining datasets. Columns as in Table~\ref{tab:gamma_acs}, plus cause~(a)
+(no $\gamma$-valid plan) and the paired gain over ordinary recourse. Mean over
+five seeds.}
+\label{tab:gamma_all}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lllrrrrrrrrr}
+\hline
+& & & & & \multicolumn{2}{c}{Closure (\%)} & & \multicolumn{3}{c}{Abst.\ cause (\%)} & \\
+Dataset & Clf. & $\gamma$ & Ref.\ valid & $\hat\varepsilon_\gamma$ & Ord. & Ours & Abst. & (a) & (b) & (c) & Gain \\
+\hline
+German-Synth & LR & 0.5 & 100.0 & 0.000 & 72.4 & 91.5 & 1.4 & 0.0 & 0.0 & 1.4 & 0.100 \\
+ &  & 0.6 & 98.9 & 0.000 & 78.6 & 91.4 & 1.7 & 0.0 & 0.0 & 1.7 & 0.067 \\
+ &  & 0.7 & 86.2 & 0.000 & 80.9 & 90.6 & 3.0 & 0.0 & 0.0 & 3.0 & 0.050 \\
+ &  & 0.8 & 45.8 & 0.000 & 81.4 & 84.6 & 10.9 & 0.0 & 0.0 & 10.9 & 0.017 \\
+ &  & 0.9 & 12.1 & 0.013 & 78.0 & 64.4 & 35.1 & 0.0 & 0.0 & 35.1 & $-$0.072 \\
+\cline{2-12}
+ & MLP & 0.5 & 100.0 & 0.000 & 76.1 & 91.2 & 1.4 & 0.0 & 0.0 & 1.4 & 0.076 \\
+ &  & 0.6 & 96.0 & 0.000 & 79.9 & 90.5 & 2.6 & 0.0 & 0.0 & 2.6 & 0.054 \\
+ &  & 0.7 & 70.1 & 0.000 & 81.7 & 87.2 & 7.3 & 0.0 & 0.0 & 7.3 & 0.028 \\
+ &  & 0.8 & 35.4 & 0.002 & 80.6 & 74.9 & 22.6 & 0.0 & 0.0 & 22.6 & $-$0.029 \\
+ &  & 0.9 & 8.6 & 0.021 & 76.6 & 51.6 & 49.7 & 0.0 & 0.0 & 49.7 & $-$0.127 \\
+\cline{2-12}
+ & RF & 0.5 & 100.0 & 0.000 & 75.5 & 91.7 & 1.0 & 0.0 & 0.0 & 1.0 & 0.081 \\
+ &  & 0.6 & 99.6 & 0.000 & 79.7 & 91.6 & 1.2 & 0.0 & 0.0 & 1.2 & 0.060 \\
+ &  & 0.7 & 85.6 & 0.000 & 81.0 & 90.8 & 2.1 & 0.0 & 0.0 & 2.1 & 0.049 \\
+ &  & 0.8 & 42.7 & 0.000 & 80.5 & 85.2 & 8.9 & 0.0 & 0.0 & 8.9 & 0.024 \\
+ &  & 0.9 & 10.0 & 0.012 & 78.1 & 65.3 & 32.0 & 0.0 & 0.0 & 32.0 & $-$0.064 \\
+\hline
+Law School & LR & 0.5 & 100.0 & 0.000 & 29.1 & 87.4 & 0.0 & 0.0 & 0.0 & 0.0 & 0.289 \\
+ &  & 0.6 & 100.0 & 0.000 & 29.1 & 87.4 & 0.0 & 0.0 & 0.0 & 0.0 & 0.289 \\
+ &  & 0.7 & 100.0 & 0.000 & 29.1 & 87.4 & 0.0 & 0.0 & 0.0 & 0.0 & 0.289 \\
+ &  & 0.8 & 100.0 & 0.000 & 29.1 & 87.4 & 0.0 & 0.0 & 0.0 & 0.0 & 0.289 \\
+ &  & 0.9 & 100.0 & 0.000 & 29.1 & 87.4 & 0.0 & 0.0 & 0.0 & 0.0 & 0.289 \\
+\cline{2-12}
+ & MLP & 0.5 & 100.0 & 0.000 & 23.9 & 78.8 & 14.3 & 0.0 & 0.0 & 14.3 & 0.237 \\
+ &  & 0.6 & 100.0 & 0.000 & 23.9 & 78.8 & 14.3 & 0.0 & 0.0 & 14.3 & 0.237 \\
+ &  & 0.7 & 100.0 & 0.000 & 23.9 & 78.8 & 14.3 & 0.0 & 0.0 & 14.3 & 0.237 \\
+ &  & 0.8 & 100.0 & 0.000 & 23.9 & 78.8 & 14.3 & 0.0 & 0.0 & 14.3 & 0.237 \\
+ &  & 0.9 & 99.5 & 0.000 & 23.9 & 78.8 & 14.3 & 0.0 & 0.0 & 14.3 & 0.237 \\
+\cline{2-12}
+ & RF & 0.5 & 100.0 & 0.000 & 28.1 & 85.1 & 0.0 & 0.0 & 0.0 & 0.0 & 0.243 \\
+ &  & 0.6 & 100.0 & 0.000 & 28.1 & 85.1 & 0.0 & 0.0 & 0.0 & 0.0 & 0.243 \\
+ &  & 0.7 & 100.0 & 0.000 & 28.1 & 85.1 & 0.0 & 0.0 & 0.0 & 0.0 & 0.243 \\
+ &  & 0.8 & 100.0 & 0.000 & 28.1 & 85.1 & 0.0 & 0.0 & 0.0 & 0.0 & 0.243 \\
+ &  & 0.9 & 100.0 & 0.000 & 28.1 & 85.1 & 0.0 & 0.0 & 0.0 & 0.0 & 0.243 \\
+\hline
+Adult & LR & 0.5 & 0.0 & 0.150 & $-$199.8 & 0.0 & 100.0 & 30.5 & 37.8 & 31.7 & 0.167 \\
+ &  & 0.6 & 0.0 & 0.193 & $-$217.6 & 0.0 & 100.0 & 31.0 & 55.4 & 13.6 & 0.182 \\
+ &  & 0.7 & 0.0 & 0.238 & $-$224.8 & 0.0 & 100.0 & 31.0 & 68.1 & 0.9 & 0.188 \\
+ &  & 0.8 & 0.0 & 0.284 & $-$229.6 & 0.0 & 100.0 & 31.0 & 69.0 & 0.0 & 0.192 \\
+ &  & 0.9 & 0.0 & 0.331 & $-$233.6 & 0.0 & 100.0 & 31.4 & 68.6 & 0.0 & 0.195 \\
+\cline{2-12}
+ & MLP & 0.5 & 0.0 & 0.139 & $-$247.6 & 0.0 & 100.0 & 35.7 & 31.8 & 32.5 & 0.180 \\
+ &  & 0.6 & 0.0 & 0.181 & $-$255.0 & 0.0 & 100.0 & 35.8 & 58.2 & 6.0 & 0.186 \\
+ &  & 0.7 & 0.0 & 0.225 & $-$260.2 & 0.0 & 100.0 & 36.0 & 64.0 & 0.0 & 0.189 \\
+ &  & 0.8 & 0.0 & 0.271 & $-$265.6 & 0.0 & 100.0 & 36.2 & 63.8 & 0.0 & 0.193 \\
+ &  & 0.9 & 0.0 & 0.318 & $-$273.0 & 0.0 & 100.0 & 36.9 & 63.1 & 0.0 & 0.198 \\
+\cline{2-12}
+ & RF & 0.5 & 0.0 & 0.118 & $-$183.5 & 0.0 & 100.0 & 40.6 & 24.1 & 35.4 & 0.140 \\
+ &  & 0.6 & 0.0 & 0.157 & $-$184.7 & 0.0 & 100.0 & 40.7 & 58.4 & 0.9 & 0.141 \\
+ &  & 0.7 & 0.0 & 0.198 & $-$185.3 & 0.0 & 100.0 & 41.0 & 59.0 & 0.0 & 0.142 \\
+ &  & 0.8 & 0.0 & 0.240 & $-$189.1 & 0.0 & 100.0 & 41.4 & 58.6 & 0.0 & 0.144 \\
+ &  & 0.9 & 0.0 & 0.284 & $-$196.3 & 0.0 & 100.0 & 41.7 & 58.3 & 0.0 & 0.150 \\
+\hline
+\end{tabular}
+\end{table*}
+
+\paragraph{Classifiers and effects.}
+Table~\ref{tab:app_effects} reports validation performance and the
+classifier-scale effect decomposition for every dataset and classifier. The
+addressable share $|\NIE|/|\mathrm{TE}|$ separates the datasets: it is
+0.85--0.90 on German-Synth and 0.69--0.79 on Law School, but only 0.13--0.24
+on ACS and 0.14--0.17 on Adult, where most of the effect runs through the
+direct path that mediator-based recourse cannot reach.
+
+\paragraph{Full recourse metrics.}
+Table~\ref{tab:app_recourse} extends Table~\ref{tab:main_results} with the
+mean post-recourse disparity, the overshoot rate and size, and the standard
+deviations of abstention and cost. Table~\ref{tab:app_compat} gives the
+compatibility diagnostics behind the abstention causes, and
+Table~\ref{tab:app_coverage} shows how many recipients our method would serve
+at other tolerances $\varepsilon$. On ACS a looser $\varepsilon=0.15$ would
+serve about half of the recipients rather than a quarter. On Adult no
+tolerance below $0.15$ serves anyone, which matches the median
+$\hat\varepsilon_\gamma$ of $0.12$--$0.15$.
+
+\paragraph{Stress test by classifier.}
+Table~\ref{tab:app_stress} breaks Table~\ref{tab:stress} down by classifier,
+with standard deviations over seeds.
+
+\paragraph{Per-seed results and within-seed intervals.}
+Tables~\ref{tab:app_seed_a} and~\ref{tab:app_seed_b} list every seed with its
+within-seed percentile-bootstrap interval. The interval for the paired gain
+excludes zero in all 60 dataset--classifier--seed combinations. On ACS the
+interval for ordinary recourse's closure contains zero in 14 of 15 fits, and
+in seed 46 the MLP and random-forest $\NIE$ estimates are slightly negative.
+
+\input{appendix_results_tables}
+
+% TODO(author): add the soft-objective ablation (rows soft_objective_recourse,
+% direct_invariance_only, transport_anchor_only in each seed's ablation JSON).

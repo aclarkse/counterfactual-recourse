@@ -1,0 +1,181 @@
+\section{Preliminaries}\label{sec:prelim}
+\subsection{Structural Causal Models and the Standard Fairness Model}
+\label{sec:sfm}
+
+A structural causal model (SCM) $\mathcal{M} = (V, U, \mathcal{F}, P_U)$
+consists of endogenous variables $V$, exogenous background variables $U$,
+structural equations~$\mathcal{F}$, and a distribution $P_U$ over exogenous
+noise \citep{pearl2000causality}.
+The associated causal directed acyclic graph (DAG) $\mathcal{G}$ encodes the
+functional dependencies among variables in~$V$.
+
+\noindent
+Counterfactual fairness frameworks built on a fully specified SCM can provide
+strong, individual-level guarantees, but the assumptions behind them are
+restrictive and often untestable. Rather than positing a full SCM, we use the
+\textbf{Standard Fairness Model} (SFM) of \citet{plecko2022causalfairnessanalysis},
+which projects the observed features onto a compact causal structure that
+captures only the roles relevant to fairness analysis.
+
+\begin{definition}[Standard Fairness Model Projection]
+\label{def:sfm}
+We partition the observed feature space as follows:
+\begin{itemize}[nosep]
+  \item $X\in\{x^{(0)},x^{(1)}\}$: a binary sensitive attribute (e.g., sex), with $x^{(0)}$ the disadvantaged group;
+  \item $W$: mediators, i.e., attributes causally downstream of $X$ that precede the outcome (e.g., education, occupation, hours worked);
+  \item $Z$: pre-treatment covariates that are not causally downstream of $X$ (e.g., birthplace, age);
+  \item $Y$: the binary outcome, used to train a classifier $\hat{f}$.
+\end{itemize}
+\end{definition}
+
+A fixed classifier $\hat f:\mathcal X\times\mathcal W\times\mathcal Z\to[0,1]$
+produces the score $\hat Y=\hat f(X,W,Z)$ and a positive decision when
+$\hat Y\ge\tau$. \emph{Recourse candidates} are disadvantaged-group true
+negatives: individuals $(x^{(0)},w_0,z)$ with $\hat f(x^{(0)},w_0,z)<\tau$ and
+$y=0$. The induced graph $\mathcal G_{\mathrm{SFM}}$ is complete across
+clusters. It contains the direct path $X\to\hat Y$, the indirect paths
+$X\to W\to\hat{Y}$ (including pathways within $W$), and the spurious paths
+$X\leftrightarrow Z\to\hat{Y}$ and $X\leftrightarrow Z\to W\to \hat{Y}$.
+Throughout, the object of study is the prediction $\hat Y$, not $Y$: recourse
+acts on the decision rule, so every effect below is an effect \emph{on the
+classifier's score}.
+
+\paragraph{Identification of classifier effects.}\label{sec:identification-assumptions}
+For $s\in\{x^{(0)},x^{(1)}\}$, let $W_s$ denote the potential mediator, the
+value $W$ would take had $X$ been set to $s$. We assume:
+\begin{itemize}[nosep]
+    \item[(i)] $Z$ contains no descendant of $X$;
+    \item[(ii)] \emph{consistency}: $W = W_s$ whenever $X=s$;
+    \item[(iii)] \emph{positivity}: $\Pr[X=s \mid z] > 0$ for all $z$ and $s$;
+    \item[(iv)] \emph{conditional ignorability}: $W_s \perp X \mid Z$.
+\end{itemize}
+Assumption~(i) makes it safe to condition on $Z$: holding $z$ fixed blocks the
+spurious $X$--$Z$ association, so it is not counted as mediated disparity.
+Consistency~(ii) links observed and potential mediators. Positivity~(iii)
+guarantees that $P(W\mid X=s,z)$ is defined for both groups at every
+recipient's covariates. Ignorability~(iv) rules out unmeasured $X$--$W$
+confounding. Together they give
+\begin{equation}
+  P(W_s\mid z)=P(W\mid X=s,z).
+  \label{eq:mediator_id}
+\end{equation}
+No assumption about confounding of $Y$ is needed. Because $\hat f$ is a known
+function, the step $W\to\hat Y$ cannot be confounded. Reading the quantities
+below as effects on the true outcome $Y$ would additionally require the
+standard sequential-ignorability conditions, which we do not claim.
+%We further make the assumption that attributes in $W$ are \emph{actionable}, meaning they can be feasibly modified by the individual (e.g., credit utilization), and hence is a valid mediating pathway.
+
+
+\subsection{Mediation Analysis on the Prediction Scale}
+\label{sec:mediation_background}
+
+We adapt the natural direct and indirect effects
+\citep{robins1992identifiability,pearl2001direct} to the classifier's score.
+For $a,b\in\{x^{(0)},x^{(1)}\}$, abbreviated $0,1$ in subscripts, define
+\begin{equation}
+  \mu_{ab}(z)\;:=\;\mathbb E\bigl[\hat f(a,W_b,z)\mid Z=z\bigr],
+  \label{eq:mu_ab}
+\end{equation}
+where $a$ is the value of $X$ that enters $\hat f$ directly and $b$ is the value
+that generates the mediators.
+
+\begin{definition}[Natural Direct and Indirect Effects on the prediction]
+\label{def:nde_nie}
+The \textbf{natural direct effect} changes $X$ in $\hat f$ while holding the
+mediators at the values they would naturally take under $x^{(0)}$; the
+\textbf{natural indirect effect} holds $X=x^{(0)}$ in $\hat f$ and changes only
+the law generating the mediators:
+\begin{equation}
+  \NDE(z)=\mu_{10}(z)-\mu_{00}(z),\qquad
+  \NIE(z)=\mu_{01}(z)-\mu_{00}(z).
+  \label{eq:effects}
+\end{equation}
+\end{definition}
+
+\noindent Both are \emph{pure} effects, measured from the same baseline
+$\mu_{00}(z)$, the disadvantaged group's own prediction. Each isolates one
+pathway: the $\NDE$ moves only the direct input $X\to\hat Y$, and the $\NIE$
+moves only the mediator law. For a nonlinear classifier they need not sum to
+the total effect, and we do not use the total effect.
+
+\paragraph{Identification.}
+By~\eqref{eq:mediator_id}, each $\mu_{ab}(z)$ is an expectation of a known
+function under an observational mediator law,
+\begin{equation}
+  \mu_{ab}(z)=\mathbb E_{W\sim P(W\mid X=b,\,z)}\bigl[\hat f(a,W,z)\bigr],
+  \label{eq:mu_id}
+\end{equation}
+which is Pearl's mediation formula with $\mathbb E[Y\mid x,w,z]$ replaced by
+$\hat f(x,w,z)$. Two features of the prediction scale simplify the classical
+setting. First, since $\hat f(a,\cdot,z)$ is deterministic, $\mu_{ab}(z)$
+depends on $W_b$ only through its conditional law, so the natural effects
+coincide with their interventional (randomized-mediator)
+analogues~\citep{didelez2006direct,vanderweele2014effect} and no cross-world
+independence assumption is needed. Second, every effect is conditional on $z$,
+so it can be evaluated at each recourse candidate's own covariates. The
+conditional mediator laws $P(W\mid X,Z)$ are estimated with a block-ordered
+normalizing flow (Section~\ref{sec:flows}).
+
+\noindent Because recourse cannot change $X$, it can at most close the mediated
+part of the disparity, the $\NIE$. The $\NDE$, carried along $X\to\hat Y$, is
+out of reach of any action on $W$. Comparing the two describes how much of the
+disparity recourse could address in principle. It does not say how much is
+actionable, since not every mediator can be changed.
+
+
+\subsection{From the Indirect Effect to a Post-Recourse Disparity}
+\label{sec:mediated_contrast}
+
+The NIE compares two \emph{natural} mediator laws. Recourse replaces one of
+them with an \emph{intervened} law, so our evaluation needs a slightly more
+general quantity. For fixed $z$ and any distribution $Q$ over $\mathcal W$, let
+\begin{equation}
+  \psi_z(Q)\;:=\;\mathbb E_{W\sim Q}\bigl[\hat f(x^{(0)},W,z)\bigr]
+  \qquad\text{and}\qquad
+  \Delta_z(Q)\;:=\;\psi_z\bigl(P_z^{(1)}\bigr)-\psi_z(Q),
+  \label{eq:delta}
+\end{equation}
+with $P_z^{(s)}:=P(W\mid X=s,z)$. The reference term
+$\psi_z(P_z^{(1)})=\mu_{01}(z)$ is fixed: it is the expected score a
+disadvantaged individual with covariates $z$ would receive if their mediators
+were distributed as in the advantaged group. Only the comparison law $Q$
+varies. The NIE is the case in which $Q$ is the disadvantaged group's own
+natural law, $\NIE(z)=\Delta_z(P_z^{(0)})$.
+
+For a recourse candidate $i$ with factual mediators $w_{0,i}$, we use three
+comparison laws:
+\begin{align}
+  D_{\mathrm{pre},i}&=\Delta_{z_i}\bigl(P_{z_i}^{(0)}\bigr)=\NIE(z_i),
+  &&\text{natural disadvantaged law,}\label{eq:dpre}\\
+  D^{\mathrm{fact}}_{\mathrm{pre},i}&=\Delta_{z_i}\bigl(\delta_{w_{0,i}}\bigr),
+  &&\text{candidate's factual mediators,}\label{eq:dpre_fact}\\
+  D_{\mathrm{post},i}&=\Delta_{z_i}\bigl(Q_{a_i}\bigr),
+  &&\text{mediators after action plan } a_i,\label{eq:dpost}
+\end{align}
+where $Q_{a_i}$ is the interventional law of $W$ induced by the candidate's
+action (Section~\ref{sec:intervention}). Only~\eqref{eq:dpre} is a natural
+indirect effect. $Q_{a_i}$ is not the law of any potential mediator $W_s$: it
+clamps the acted mediators, keeps the candidate's upstream values, and
+regenerates the downstream ones. $D_{\mathrm{post},i}$ therefore contrasts a
+natural mediator law with an intervened one, in the spirit of
+stochastic-intervention effects~\citep{diaz2012population}, and we call it the
+\emph{post-recourse mediated disparity} rather than an NIE. Since all three
+share the same reference term,
+\begin{equation}
+  D_{\mathrm{post},i}
+  \;=\;D^{\mathrm{fact}}_{\mathrm{pre},i}
+  \;-\;\underbrace{\bigl[\psi_{z_i}(Q_{a_i})-\hat f(x^{(0)},w_{0,i},z_i)\bigr]}_{
+     \text{effect of the action on the candidate's score}}.
+  \label{eq:dpost_decomp}
+\end{equation}
+Recourse reduces the mediated disparity by exactly the expected score gain it
+produces, and $\mu_{01}(z_i)$ is the target that gain should reach. A negative
+$D_{\mathrm{post},i}$ is overshoot: the action raised the expected score above
+what the advantaged mediator law would give.
+
+Candidates are selected on their factual features, through
+$\hat f(x^{(0)},w_{0,i},z_i)<\tau$, so $w_{0,i}$ is not a representative draw
+from $P_{z_i}^{(0)}$. We therefore use the NIE decomposition~\eqref{eq:effects}
+to describe the disparity at the population level, and measure closure
+against $D^{\mathrm{fact}}_{\mathrm{pre},i}$, the baseline that
+\eqref{eq:dpost_decomp} compares recourse with.

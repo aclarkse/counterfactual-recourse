@@ -1,0 +1,113 @@
+\section{Proofs and Discussion for Section~\ref{sec:theory}}
+\label{app:theory}
+
+We first give a closed form for $\varepsilon_\gamma(z)$, then prove
+Theorem~\ref{thm:val-par}, and finally prove two further consequences used in
+Sections~\ref{sec:theory} and~\ref{sec:evaluation}. Throughout, we use the
+closed form of the one-dimensional Wasserstein distance,
+$W_1(G,R)=\int_0^1|G^{-1}(u)-F_R^{-1}(u)|\,du$, where $F_R^{-1}$ is the quantile
+function of $R$.
+
+\begin{proposition}[Closed form of the compatibility threshold]
+\label{prop:compat}
+The infimum defining $\varepsilon_\gamma(z)$ in Theorem~\ref{thm:val-par} is
+attained, and
+\begin{equation}
+  \varepsilon_\gamma(z)\;=\;\int_{1-\gamma}^{1}
+      \bigl(\tau-F_{R_z}^{-1}(u)\bigr)_+\,du .
+  \label{eq:eps_gamma}
+\end{equation}
+Moreover, $\varepsilon_\gamma(z)=0$ if and only if $R_z([\tau,1])\ge\gamma$.
+\end{proposition}
+
+\begin{proof}
+If $G([\tau,1])\ge\gamma$, then $G^{-1}(u)\ge\tau$ for all $u>1-\gamma$, so the
+integrand of $W_1(G,R_z)$ is at least $(\tau-F_{R_z}^{-1}(u))_+$ on
+$(1-\gamma,1]$ and nonnegative elsewhere. Hence $W_1(G,R_z)$ is at least the
+right-hand side of~\eqref{eq:eps_gamma}. Equality holds for the nondecreasing
+quantile function $G^{-1}(u)=\max\{F_{R_z}^{-1}(u),\tau\}$ on $(1-\gamma,1]$ and
+$G^{-1}=F_{R_z}^{-1}$ otherwise, which places mass at least $\gamma$ on
+$[\tau,1]$; so the infimum is attained and equals~\eqref{eq:eps_gamma}. The
+integrand vanishes almost everywhere on $(1-\gamma,1]$ exactly when
+$F_{R_z}^{-1}(u)\ge\tau$ there, i.e., when $R_z([\tau,1])\ge\gamma$.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:val-par}]
+If no $\gamma$-valid action exists, $\varepsilon_{\mathcal A}(z,w_0)=+\infty$
+and~\eqref{eq:feasibility_bound} holds trivially. Otherwise, for every
+$\gamma$-valid action $a$, $P_a$ is a distribution on $[0,1]$ with
+$P_a([\tau,1])\ge\gamma$, so it is admissible in the infimum defining
+$\varepsilon_\gamma(z)$ and $W_1(P_a,R_z)\ge\varepsilon_\gamma(z)$. Taking the
+minimum over the finite set of $\gamma$-valid actions
+gives~\eqref{eq:feasibility_bound}. Program~\eqref{eq:program} is feasible if
+and only if some $\gamma$-valid action has $W_1(P_a,R_z)\le\varepsilon$, which,
+because $\mathcal A(w_0)$ is finite and the minimum is attained, holds if and
+only if $\varepsilon\ge\varepsilon_{\mathcal A}(z,w_0)$. Any solution $a^*$ is
+feasible and therefore satisfies $W_1(P_{a^*},R_z)\le\varepsilon$. The final
+claim is Proposition~\ref{prop:compat}.
+\end{proof}
+
+\noindent Because $\varepsilon_\gamma(z)$ depends only on $\hat f$, the
+advantaged mediator distribution at $z$, and $(\tau,\gamma)$, and not on the
+recipient's factual mediators, the action set, or the cost, cause~(b) in
+Section~\ref{sec:theory} can be attributed to the target rather than to the
+recourse problem.
+
+\begin{proposition}[Validity alone forces overshoot]
+\label{prop:overshoot}
+Every $\gamma$-valid plan satisfies $\mathbb E[P_a]\ge\gamma\tau$, so
+$D_{\mathrm{post},i}\le\mu_{\mathrm{ref}}(z)-\gamma\tau$. Moreover,
+$\varepsilon_\gamma(z)\ge\bigl(\gamma\tau-\mu_{\mathrm{ref}}(z)\bigr)_+$.
+\end{proposition}
+
+\begin{proof}
+Scores are nonnegative, so
+$\mathbb E[P_a]\ge\tau\,P_a([\tau,1])\ge\gamma\tau$. For any $\gamma$-valid $G$,
+$W_1(G,R_z)\ge\mathbb E[G]-\mu_{\mathrm{ref}}(z)\ge\gamma\tau-\mu_{\mathrm{ref}}(z)$.
+Taking the minimizing $G$ from Proposition~\ref{prop:compat} gives the
+second claim.
+\end{proof}
+
+\begin{proposition}[What the parity constraint guarantees]
+\label{prop:guarantee}
+If recipient $i$ is feasible, then
+$|D_{\mathrm{post},i}|\le W_1(P_{a^*_i},R_{z_i})\le\varepsilon$, and the same bound
+holds for every 1-Lipschitz statistic of the score distribution. If recipient
+$i$ abstains, then $D_{\mathrm{post},i}=D^{\mathrm{fact}}_{\mathrm{pre},i}$.
+Hence, with feasibility rate $\pi$ among $n$ recipients,
+\begin{equation}
+  \frac1n\sum_{i=1}^n|D_{\mathrm{post},i}|
+  \;\le\;\pi\,\varepsilon+(1-\pi)\,
+  \overline{|D^{\mathrm{fact}}_{\mathrm{pre}}|}_{\mathrm{abst}},
+  \label{eq:guarantee}
+\end{equation}
+where the last term averages over abstaining recipients.
+\end{proposition}
+
+\begin{proof}
+The first claim is Kantorovich--Rubinstein duality applied to the identity map
+on $[0,1]$. An abstaining recipient keeps $w_0$, so $P_{a^*_i}$ is a point mass
+at $\hat f_0(w_{0,i},z_i)$. Averaging the two cases gives~\eqref{eq:guarantee}.
+\end{proof}
+
+\paragraph{Three regimes.}
+Proposition~\ref{prop:overshoot} indexes the behaviour of both methods by a
+single interpretable quantity, $\mu_{\mathrm{ref}}(z)-\gamma\tau$.
+\begin{itemize}[nosep]
+  \item \emph{Provably incompatible}, $\mu_{\mathrm{ref}}(z)<\gamma\tau-\varepsilon$:
+        every validity-constrained plan, including ordinary recourse, overshoots
+        the advantaged reference, and the parity-constrained method must abstain.
+        No action set or cost can change this.
+  \item \emph{Room for improvement}, $\mu_{\mathrm{ref}}(z)>\gamma\tau+\varepsilon$:
+        validity only guarantees $\mathbb E[P_a]\ge\gamma\tau$, so ordinary
+        recourse may leave up to $\mu_{\mathrm{ref}}(z)-\gamma\tau$ of the mediated
+        disparity unclosed. The parity constraint forces
+        $\mathbb E[P_a]\ge\mu_{\mathrm{ref}}(z)-\varepsilon$. This is where the
+        parity constraint should yield paired improvements over the baseline.
+        Feasibility still depends on $\varepsilon_\gamma(z)$ and on reachability.
+  \item \emph{Intermediate}: the outcome is decided by the full shape of
+        $R_z$, through $\varepsilon_\gamma(z)$, not by its mean.
+\end{itemize}
+The compatibility diagnostics in Section~\ref{sec:evaluation} estimate each of
+these quantities from the same empirical score distributions used to solve
+\eqref{eq:program}.
