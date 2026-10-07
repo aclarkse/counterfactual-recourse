@@ -31,6 +31,9 @@ from evaluation.recourse_metrics import (
     estimate_reference_terms,
     select_best,
     select_distribution_constrained,
+    select_mean_parity,
+    select_mediator_matching,
+    select_plausibility_constrained,
     select_recourse_indices,
     select_validity_constrained,
 )
@@ -381,6 +384,44 @@ def run_grid(all_candidates, references, factual_predictions, eta_grid,
         )
         rows.append(summary)
         selected_record_sets.append(records)
+
+        # Alternative selection rules on the same candidate and reference
+        # draws, each under the same gamma-validity and abstention rule.
+        gamma = constrained_config["min_success_probability"]
+        epsilon = constrained_config["max_outcome_wasserstein"]
+        baselines = {
+            "mean_parity_recourse": lambda c, i: select_mean_parity(
+                c, gamma, references["reference"][i], epsilon),
+            "mediator_matching_recourse": lambda c, i: (
+                select_mediator_matching(c, gamma)),
+            "plausibility_constrained_recourse": lambda c, i: (
+                select_plausibility_constrained(c, gamma)),
+        }
+        for method, selector in baselines.items():
+            if method == "plausibility_constrained_recourse" and not all(
+                    "plausibility" in c for c in all_candidates[0]):
+                continue
+            records = []
+            for i, candidates in enumerate(all_candidates):
+                best = dict(selector(candidates, i))
+                attach_mediated_disparities(
+                    best, references["reference"][i],
+                    references["natural_disadvantaged"][i],
+                    factual_predictions[i], disadvantaged_value,
+                )
+                records.append(best)
+            summary = summarize(records, n_boot=n_boot)
+            summary.update(
+                eta=0.0, lambda_invariance=0.0, rho_anchor=0.0,
+                min_success_probability=float(gamma),
+                max_outcome_wasserstein=(
+                    float(epsilon) if method == "mean_parity_recourse"
+                    else None),
+                method=method,
+                is_ordinary_actionable_baseline=False,
+            )
+            rows.append(summary)
+            selected_record_sets.append(records)
     soft_baseline_records = {
         row["eta"]: records
         for row, records in zip(rows, selected_record_sets)
@@ -393,7 +434,10 @@ def run_grid(all_candidates, references, factual_predictions, eta_grid,
     for row, records in zip(rows, selected_record_sets):
         if row["method"] in (
                 "ordinary_actionable_recourse",
-                "distribution_constrained_recourse"):
+                "distribution_constrained_recourse",
+                "mean_parity_recourse",
+                "mediator_matching_recourse",
+                "plausibility_constrained_recourse"):
             comparison_records = clean_baseline_records
         else:
             comparison_records = soft_baseline_records[row["eta"]]
@@ -453,6 +497,9 @@ def _latex(rows, model_name, label):
             "transport_anchor_only": "Anchor only",
             "mediation_aware_recourse": "Full",
             "distribution_constrained_recourse": "Distribution constrained",
+            "mean_parity_recourse": "Mean parity",
+            "mediator_matching_recourse": "Mediator matching",
+            "plausibility_constrained_recourse": "Plausibility constrained",
         }[row["method"]]
         lines.append(
             f"{method} & {row['eta']:g} & {row['lambda_invariance']:g} & "

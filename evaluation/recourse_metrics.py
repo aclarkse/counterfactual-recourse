@@ -248,6 +248,57 @@ def select_distribution_constrained(candidates, min_success_probability,
     return selected
 
 
+def _select_valid_or_abstain(candidates, min_success_probability,
+                             admissible, key):
+    """Pick the key-minimizing gamma-valid admissible plan, or abstain."""
+    feasible = [
+        candidate for candidate in candidates
+        if candidate.get("success_probability_xi", 0.0)
+        >= min_success_probability and admissible(candidate)
+    ]
+    if feasible:
+        selected = dict(min(feasible, key=key))
+        selected["constraint_feasible"] = True
+        selected["constraint_abstained"] = False
+        return selected
+    selected = dict(min(candidates, key=lambda candidate: candidate["cost"]))
+    selected["constraint_feasible"] = False
+    selected["constraint_abstained"] = True
+    return selected
+
+
+def select_mean_parity(candidates, min_success_probability, reference_mean,
+                       max_mean_gap):
+    """Baseline: cheapest valid plan whose mean score is within the tolerance
+    of the reference mean. |E[P_a]-E[R]| <= W1(P_a,R), so this is the
+    first-moment relaxation of the distributional constraint."""
+    return _select_valid_or_abstain(
+        candidates, min_success_probability,
+        lambda c: abs(c["p_xi"] - reference_mean) <= max_mean_gap,
+        lambda c: (c["cost"], abs(c["p_xi"] - reference_mean)),
+    )
+
+
+def select_mediator_matching(candidates, min_success_probability):
+    """Baseline: valid plan whose post-intervention mediators are closest to
+    the advantaged reference mediators (sum of per-mediator normalized W1),
+    i.e. a counterfactual-twin target in mediator space; ties go to cost."""
+    return _select_valid_or_abstain(
+        candidates, min_success_probability, lambda c: True,
+        lambda c: (c["transport_marginal_w1"], c["cost"]),
+    )
+
+
+def select_plausibility_constrained(candidates, min_success_probability):
+    """Baseline: cheapest valid plan whose post-intervention mediators are at
+    least as likely under the fitted mediator model as the recipient's own."""
+    return _select_valid_or_abstain(
+        candidates, min_success_probability,
+        lambda c: c["plausibility"] >= c["factual_plausibility"],
+        lambda c: (c["cost"], -c["plausibility"]),
+    )
+
+
 def attach_mediated_disparities(record, reference, natural_disadvantaged,
                                 factual_prediction, disadvantaged_value=0):
     """Attach pre/post mediated prediction-disparity plug-in estimates."""

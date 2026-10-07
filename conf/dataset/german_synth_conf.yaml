@@ -1,0 +1,159 @@
+name: german_synth_conf
+
+loader:
+  module: data.german_synth_confounded
+  fn: load_german_synth_confounded
+  kwargs:
+    # Latent U shifts SEX and every ordinal mediator with strength delta;
+    # PROXY = U + proxy_sigma * noise is generated but enters Z only when
+    # listed in sfm.confounders (see evaluation/confounding_sensitivity.py).
+    n_samples: 10000
+    data_seed: 0
+    delta: 0.0
+    proxy_sigma: 0.5
+
+split:
+  test_size: 2000
+  stratify: false
+
+sfm:
+  sensitive: [SEX]
+  confounders: [AGE]
+  standardize_confounders: [AGE]
+  mediators_disc: [EDUCATION, JOB, SAVINGS_GRP]
+  mediators_cont: [CREDIT_AMOUNT, DURATION]
+  mediator_layers:
+    # Matches the generating SCM in data/german_synth.py exactly; amount and
+    # duration share correlated noise but have no causal order.
+    - [EDUCATION]
+    - [JOB]
+    - [SAVINGS_GRP]
+    - [CREDIT_AMOUNT, DURATION]
+  outcome: GOOD_CREDIT
+  estimand: all_sensitive_paths_through_mediators
+
+wc_clip: null
+
+flow:
+  artifact_version: german_synth_confounded_v1
+  continuous_family: spline
+  condition_cont_on_disc: true
+  reuse_tensors: true
+  hidden_dim: 64
+  n_layers: 2
+  condition_cont_on_sensitive: false
+  disc_within_block_autoregressive: true
+  disc_autoregressive: true
+  disc_embed_dim: 4
+  embed_dim: 4
+  hidden_features: 64
+  n_flow_layers: 3
+  n_blocks: 2
+  num_bins: 8
+  tail_bound: 3.0
+  batch_size: 256
+  max_epochs: 200
+  lr: 0.001
+  patience: 20
+  checkpoint_selection:
+    posterior_predictive: true
+    samples_per_context: 16
+    max_rows: 2000
+    min_group_rows: 200
+    ordered_mediators: [EDUCATION, JOB, SAVINGS_GRP]
+    max_overall_marginal_tv: 0.08
+    max_group_marginal_tv: 0.12
+    max_ordered_wasserstein: 0.12
+    max_overall_continuous_w1: 0.15
+    max_group_continuous_w1: 0.30
+    max_continuous_correlation_error: 0.15
+    score_weight: 1.0
+
+outcome:
+  # [SEX | AGE | EDUCATION,JOB,SAVINGS | AMOUNT,DURATION]
+  col_types:
+    X: [passthrough]
+    Z: [scale]
+    Wd: [ohe, ohe, ohe]
+    Wc: [scale, scale]
+  models:
+    - name: "Logistic Reg."
+      type: logreg
+      C: 1.0
+      max_iter: 1000
+    - name: "MLP (64--32)"
+      type: mlp
+      hidden_layer_sizes: [64, 32]
+      max_iter: 500
+    # Same hyperparameters as the Bar Passage random forest.
+    - name: "Random Forest"
+      type: random_forest
+      n_estimators: 300
+      min_samples_leaf: 20
+      max_features: sqrt
+      n_jobs: -1
+
+gap:
+  K: 500
+  n_inst: 500
+  n_boot: 2000
+
+recourse:
+  # Sampling and subsampling settings match conf/dataset/bar.yaml.
+  propagate_descendants: true
+  intervention_K: 32
+  same_level_semantics: preserve_factual
+  threshold: 0.5
+  nu: 0.05
+  eta: 10.0
+  lambda_invariance: 0.0
+  rho_anchor: 0.0
+  disadvantaged_value: 0
+  advantaged_value: 1
+  reference_K: 200
+  eta_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  lambda_grid: [0.0, 0.5, 1.0, 2.0, 5.0]
+  rho_grid: [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+  constrained_recourse:
+    enabled: true
+    # Require at least 50% of propagated prediction draws to be favorable.
+    min_success_probability: 0.5
+    max_outcome_wasserstein: 0.1
+    # Validity levels re-evaluated on the same candidate draws.
+    gamma_sensitivity_grid: [0.5, 0.6, 0.7, 0.8, 0.9]
+  n_max: 0
+  n_boot: 1000
+  sweep_n_max: 250
+  mediators:
+    EDUCATION:
+      display: "$\\Delta\\mathrm{Education}$"
+      type: discrete
+      actionable: fixed
+    JOB:
+      display: "$\\Delta\\mathrm{Job}$"
+      type: discrete
+      actionable: monotone_up
+    SAVINGS_GRP:
+      display: "$\\Delta\\mathrm{Savings}$"
+      type: discrete
+      actionable: monotone_up
+    CREDIT_AMOUNT:
+      display: "$\\Delta\\mathrm{CreditAmount}$"
+      type: continuous
+      actionable: monotone_down
+      clip: [250, 18424]
+      step: 2000
+    DURATION:
+      display: "$\\Delta\\mathrm{Duration}$"
+      type: continuous
+      actionable: monotone_down
+      clip: [4, 72]
+      step: 12
+
+paths:
+  tensors: outputs/data/german_synth_conf_tensors.pt
+  flows: outputs/flows/german_synth_conf/flow_models.pt
+  outcome_dir: outputs/outcome/german_synth_conf
+  gaps_dir: outputs/gaps
+  recourse_dir: outputs/recourse
+  figures_dir: figures/german_synth_conf

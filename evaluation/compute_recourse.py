@@ -251,6 +251,19 @@ def precompute_candidates_batch(pipe, scaler, xi, zi, wdi, wci,
     ]
 
 
+@torch.no_grad()
+def _mediator_log_prob(g_phi, f_theta, w_disc, w_cont, x, z,
+                       batch_size=65_536):
+    """Joint mediator log-density log g_phi(w_disc|x,z) + log f_theta(w_cont|.)."""
+    out = []
+    for start in range(0, x.shape[0], batch_size):
+        sl = slice(start, start + batch_size)
+        out.append((g_phi.log_prob(w_disc[sl], x[sl], z[sl])
+                    + f_theta.log_prob(w_cont[sl], w_disc[sl], x[sl], z[sl])
+                    ).cpu())
+    return torch.cat(out).numpy()
+
+
 def _predict_proba_batched(pipe, features, batch_size=100_000):
     return np.concatenate([
         pipe.predict_proba(features[start:start + batch_size])[:, 1]
@@ -308,6 +321,17 @@ def precompute_interventional_candidates_batch(
         torch.as_tensor(mask_wc_np, dtype=torch.bool, device=device),
         n_samples=n_samples, same_level=same_level,
     )
+    # Plausibility: mean log-density of each plan's post-intervention
+    # mediators under the fitted observational law at the recipient's own
+    # (x, z). Continuous mediators are scored in the quantile-normal space the
+    # flow is trained in. Log-densities consume no random numbers.
+    plausibility_draws = _mediator_log_prob(
+        g_phi, f_theta, samples.w_disc, samples.w_cont, samples.x, samples.z,
+    ).reshape(n_plans, n_samples)
+    factual_plausibility = float(_mediator_log_prob(
+        g_phi, f_theta, wdi.to(device), wci.to(device), xi.to(device),
+        zi.to(device),
+    )[0])
     sampled_wd = samples.w_disc.cpu()
     sampled_wc = samples.w_cont.cpu()
     sampled_x = samples.x.cpu()
@@ -347,6 +371,8 @@ def precompute_interventional_candidates_batch(
             outcome_wasserstein=float(outcome_wasserstein[i]),
             outcome_sd_xi=float(p_actual_draws[i].std()),
             outcome_sd_xcf=float(p_cf_draws[i].std()),
+            plausibility=float(plausibility_draws[i].mean()),
+            factual_plausibility=factual_plausibility,
             intervention_semantics="propagate_strict_descendants",
             same_level_semantics=same_level,
             **{key: (int(value[i]) if value.dtype == np.int32 else float(value[i]))

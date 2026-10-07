@@ -1,0 +1,76 @@
+{
+  "delta": 0.5,
+  "proxy": "none",
+  "seed": 46,
+  "models": {
+    "Logistic Reg.": {
+      "nie_fit": 0.2116987505555153,
+      "nie_true": 0.17385268944501878,
+      "nde_fit": 0.028082103073596956,
+      "nde_true": 0.027649013340473174,
+      "n_recipients": 250,
+      "reference_validity_fit": 1.0,
+      "reference_validity_true": 1.0,
+      "reference_mean_bias": 0.017952357292175293,
+      "ordinary": {
+        "closure_fit": 0.7011887956031626,
+        "closure_true": 0.7220697936056315,
+        "abstention": 0.0,
+        "overshoot_true": 0.2
+      },
+      "ours": {
+        "closure_fit": 0.9012861263736464,
+        "closure_true": 0.8554920116441816,
+        "abstention": 0.044,
+        "overshoot_true": 0.628
+      },
+      "paired_gain_true": 0.0680892118474337
+    },
+    "MLP (64--32)": {
+      "nie_fit": 0.20323137122392654,
+      "nie_true": 0.16644863897562026,
+      "nde_fit": 0.04969939458370209,
+      "nde_true": 0.048562566578388214,
+      "n_recipients": 250,
+      "reference_validity_fit": 1.0,
+      "reference_validity_true": 1.0,
+      "reference_mean_bias": 0.020663893222808837,
+      "ordinary": {
+        "closure_fit": 0.7244967970857364,
+        "closure_true": 0.7339164562009652,
+        "abstention": 0.0,
+        "overshoot_true": 0.088
+      },
+      "ours": {
+        "closure_fit": 0.9097426768066851,
+        "closure_true": 0.8654201394618181,
+        "abstention": 0.028,
+        "overshoot_true": 0.564
+      },
+      "paired_gain_true": 0.06778871175264158
+    },
+    "Random Forest": {
+      "nie_fit": 0.2023966711163521,
+      "nie_true": 0.16372666734457017,
+      "nde_fit": 0.015935652494430543,
+      "nde_true": 0.016192189872264864,
+      "n_recipients": 250,
+      "reference_validity_fit": 1.0,
+      "reference_validity_true": 1.0,
+      "reference_mean_bias": 0.021131909132003784,
+      "ordinary": {
+        "closure_fit": 0.7500928400141506,
+        "closure_true": 0.7636479102823295,
+        "abstention": 0.0,
+        "overshoot_true": 0.132
+      },
+      "ours": {
+        "closure_fit": 0.9118741502798067,
+        "closure_true": 0.8765733522286978,
+        "abstention": 0.024,
+        "overshoot_true": 0.66
+      },
+      "paired_gain_true": 0.05608414570225675
+    }
+  }
+}

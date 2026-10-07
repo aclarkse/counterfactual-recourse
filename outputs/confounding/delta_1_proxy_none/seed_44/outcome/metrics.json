@@ -1,0 +1,150 @@
+{
+  "seed": 44,
+  "dataset": "german_synth_conf",
+  "models": {
+    "Logistic Reg.": {
+      "type": "logreg",
+      "slug": "logreg",
+      "train": {
+        "n": 8000,
+        "accuracy": 0.83525,
+        "auc": 0.9054937300209775,
+        "mean_predicted_probability": 0.6522127704099148,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 4064,
+            "accuracy": 0.796505905511811,
+            "auc": 0.8843897157142027,
+            "mean_predicted_probability": 0.5069088209189566
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 3936,
+            "accuracy": 0.8752540650406504,
+            "auc": 0.8925351374320085,
+            "mean_predicted_probability": 0.8022420515916359
+          }
+        }
+      },
+      "validation": {
+        "n": 2000,
+        "accuracy": 0.823,
+        "auc": 0.8948037685682908,
+        "mean_predicted_probability": 0.6671823110704054,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 957,
+            "accuracy": 0.7732497387669801,
+            "auc": 0.8643152291907413,
+            "mean_predicted_probability": 0.5121294930841551
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 1043,
+            "accuracy": 0.8686481303930969,
+            "auc": 0.8921189775587619,
+            "mean_predicted_probability": 0.8094503329427367
+          }
+        }
+      }
+    },
+    "MLP (64--32)": {
+      "type": "mlp",
+      "slug": "mlp",
+      "train": {
+        "n": 8000,
+        "accuracy": 0.841,
+        "auc": 0.9116411586393283,
+        "mean_predicted_probability": 0.664018673472092,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 4064,
+            "accuracy": 0.8056102362204725,
+            "auc": 0.892246574811542,
+            "mean_predicted_probability": 0.5179094787001642
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 3936,
+            "accuracy": 0.8775406504065041,
+            "auc": 0.8989557674555665,
+            "mean_predicted_probability": 0.8148793867731882
+          }
+        }
+      },
+      "validation": {
+        "n": 2000,
+        "accuracy": 0.835,
+        "auc": 0.8989200442907641,
+        "mean_predicted_probability": 0.677391468233272,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 957,
+            "accuracy": 0.7889237199582028,
+            "auc": 0.8691651784150997,
+            "mean_predicted_probability": 0.5217728078640945
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 1043,
+            "accuracy": 0.8772770853307766,
+            "auc": 0.8959241795771736,
+            "mean_predicted_probability": 0.8201786762613665
+          }
+        }
+      }
+    },
+    "Random Forest": {
+      "type": "random_forest",
+      "slug": "random_forest",
+      "train": {
+        "n": 8000,
+        "accuracy": 0.85275,
+        "auc": 0.9269190401306764,
+        "mean_predicted_probability": 0.6521629282864363,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 4064,
+            "accuracy": 0.8208661417322834,
+            "auc": 0.9082199678313275,
+            "mean_predicted_probability": 0.5137519359733579
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 3936,
+            "accuracy": 0.885670731707317,
+            "auc": 0.9234347501184408,
+            "mean_predicted_probability": 0.795075091081241
+          }
+        }
+      },
+      "validation": {
+        "n": 2000,
+        "accuracy": 0.829,
+        "auc": 0.8983080429443611,
+        "mean_predicted_probability": 0.6642440274818735,
+        "groups": {
+          "0": {
+            "label": "Group 0",
+            "n": 957,
+            "accuracy": 0.7795193312434692,
+            "auc": 0.8670159680638723,
+            "mean_predicted_probability": 0.5163714851734004
+          },
+          "1": {
+            "label": "Group 1",
+            "n": 1043,
+            "accuracy": 0.8744007670182167,
+            "auc": 0.8973186324907529,
+            "mean_predicted_probability": 0.7999238194178359
+          }
+        }
+      }
+    }
+  }
+}
