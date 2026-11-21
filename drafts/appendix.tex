@@ -369,36 +369,37 @@ in the permitted direction. The factual value is always in the grid.
 \begin{table*}[t]
 \centering
 \small
-\caption{SFM roles, mediator block order, and actionability. Blocks are
-listed in causal order; variables in one block are unordered. Mediator types:
-D = categorical (number of categories), C = continuous. Actionability:
+\caption{SFM roles, mediator blocks, and action grids. Blocks $W_1,W_2,\ldots$
+are listed in causal order; mediators that share a block are unordered.
+Type: D = categorical (number of categories), C = continuous. Action:
 $\uparrow$ monotone up, $\downarrow$ monotone down, $\leftrightarrow$ free,
-fixed = not actionable.}
+fixed = not actionable. A categorical mediator may move to any category
+permitted by its direction. A continuous mediator moves on a grid with the
+stated step from its factual value to the stated bound; the factual value is
+always in the grid.}
 \label{tab:roles}
-\begin{tabular}{lllll}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lll c l c c c c}
 \hline
-Dataset & $X$ & $Z$ & Mediator blocks (type) & Actionability (step; bounds) \\
+Dataset & $X$ & $Z$ & Block & Mediator & Type & Action & Step & Bound \\
 \hline
-German-Synth & sex & age &
-  $[\textsc{Educ}]$ (D, 4) & fixed \\
-& & & $\to[\textsc{Job}]$ (D, 4) & $\uparrow$ \\
-& & & $\to[\textsc{Savings}]$ (D, 4) & $\uparrow$ \\
-& & & $\to[\textsc{Amount},\textsc{Duration}]$ (C) &
-  $\downarrow$ (2{,}000\,DM; $\ge250$), $\downarrow$ (12 mo.; $\ge4$) \\
+German-Synth & sex & age & $W_1$ & Education     & D (4)  & fixed            & --      & -- \\
+             &     &     & $W_2$ & Job level     & D (4)  & $\uparrow$       & --      & -- \\
+             &     &     & $W_3$ & Savings       & D (4)  & $\uparrow$       & --      & -- \\
+             &     &     & $W_4$ & Credit amount & C      & $\downarrow$     & 2{,}000\,DM & $\ge 250$ \\
+             &     &     & $W_4$ & Duration      & C      & $\downarrow$     & 12 mo.  & $\ge 4$ \\
 \hline
-Law School & race & gender, family income &
-  $[\textsc{LSAT},\textsc{GPA}]$ (C) & $\uparrow$ (1; $\le48$), $\uparrow$ (0.05; $\le4.0$) \\
+Law School   & race & gender, & $W_1$ & LSAT       & C      & $\uparrow$       & 1       & $\le 48$ \\
+             &      & family income & $W_1$ & GPA  & C      & $\uparrow$       & 0.05    & $\le 4.0$ \\
 \hline
-ACS Income & sex & age, US-born &
-  $[\textsc{Educ}]$ (D, 6) & $\uparrow$ \\
-& & & $\to[\textsc{Occ}]$ (D, 10) & $\leftrightarrow$ \\
-& & & $\to[\textsc{Hours},\textsc{Weeks}]$ (C) &
-  $\uparrow$ (5 h/wk; $\le60$), $\uparrow$ (4 wk/yr; $\le52$) \\
+ACS Income   & sex & age,     & $W_1$ & Education     & D (6)  & $\uparrow$       & --      & -- \\
+             &     & US-born  & $W_2$ & Occupation    & D (10) & $\leftrightarrow$ & --     & -- \\
+             &     &          & $W_3$ & Weekly hours  & C      & $\uparrow$       & 5 h     & $\le 60$ \\
+             &     &          & $W_3$ & Weeks worked  & C      & $\uparrow$       & 4 wk    & $\le 52$ \\
 \hline
-Adult & sex & age, US-born &
-  $[\textsc{Educ}]$ (D, 6) & $\uparrow$ \\
-& & & $\to[\textsc{Occ}]$ (D, 14) & $\leftrightarrow$ \\
-& & & $\to[\textsc{HoursBin}]$ (D, 8) & $\uparrow$ \\
+Adult        & sex & age,     & $W_1$ & Education     & D (6)  & $\uparrow$       & --      & -- \\
+             &     & US-born  & $W_2$ & Occupation    & D (14) & $\leftrightarrow$ & --     & -- \\
+             &     &          & $W_3$ & Hours bin     & D (8)  & $\uparrow$       & --      & -- \\
 \hline
 \end{tabular}
 \end{table*}
@@ -730,21 +731,70 @@ report the mean $\pm$ sample standard deviation over the five seeds, which
 also reflects refitting the whole pipeline. Per-seed intervals are in
 Tables~\ref{tab:app_seed_a} and~\ref{tab:app_seed_b}.
 
-\subsection{Recourse Settings}
+\subsection{Recourse and Sensitivity Settings}
 \label{app:exp_recourse}
 
-Both methods use the cost~\eqref{eq:cost}, the action grids and bounds of
-Table~\ref{tab:roles}, and the intervention law $Q_a$, under which
-descendants of acted mediators are redrawn and unacted coordinates in the
-acted block keep their factual values. Both also use the abstention rule of
-Section~\ref{sec:recourse_selection}. Ordinary actionable recourse returns the
-cheapest $\gamma$-valid plan. Our method returns the cheapest $\gamma$-valid
-plan with $W_1(P_a,R_{z_i})\le\varepsilon$. The main results use $\gamma=0.5$
-and $\varepsilon=0.1$ on every dataset. The sensitivity analysis re-selects
-plans from the same draws for $\gamma\in\{0.5,0.6,0.7,0.8,0.9\}$
-(Table~\ref{tab:gamma_all}). Coverage diagnostics evaluate
-$\varepsilon\in\{0.025,0.05,0.075,0.1,0.15,0.2,0.3,0.5\}$, plus $0.4$ on ACS
+\paragraph{Main comparison.}
+Both methods use the cost in~\eqref{eq:cost}, the action grids of
+Table~\ref{tab:roles}, and the intervention distribution $Q_a$, and both
+abstain when no admissible action exists. Ordinary recourse selects the
+cheapest $\gamma$-valid action, whereas our method additionally requires
+$W_1(P_a,R_{z_i})\le\varepsilon$. Main results use $\gamma=0.5$ and
+$\varepsilon=0.1$ throughout. The validity sensitivity analysis re-selects
+actions from the same draws for $\gamma\in\{0.5,0.6,0.7,0.8,0.9\}$
+(Tables~\ref{tab:gamma_acs} and~\ref{tab:gamma_all}). Coverage diagnostics
+evaluate $\varepsilon\in\{0.025,0.05,0.075,0.1,0.15,0.2,0.3,0.5\}$, with
+$\varepsilon=0.4$ additionally evaluated on ACS
 (Table~\ref{tab:app_coverage}).
+
+\paragraph{Additional baselines.}
+Table~\ref{tab:app_baselines} compares six further selection rules at
+$\gamma=0.5$. Each selects from the same candidate actions, intervention
+draws, and reference draws as the two methods above. All except the soft
+anchor impose $\gamma$-validity and abstain under the same rule when no action
+is admissible.
+\begin{itemize}[nosep]
+  \item \emph{Robust}: ordinary recourse at $\gamma=0.9$.
+  \item \emph{Tuned $\gamma^\star$}: ordinary recourse at the $\gamma$ in the
+        grid above with the highest mean closure, chosen post hoc on the
+        evaluation recipients separately for each dataset and classifier.
+  \item \emph{Soft anchor}: minimizes cost plus $\eta$ times the expected
+        shortfall of the score below $\tau-0.05$ (summed over both values of
+        the classifier's $X$ input), plus $\rho$ times an upper bound on the
+        mediator-space transport distance to the advantaged reference (the
+        expected mixed ground distance under the independent coupling), with
+        $\eta=\rho=10$. Validity is penalized rather than imposed.
+  \item \emph{Mean parity}: the cheapest $\gamma$-valid action with
+        $|\mathbb E[P_a]-\hat\mu_{\mathrm{ref}}(z_i)|\le\varepsilon$, with
+        $\varepsilon=0.1$.
+  \item \emph{Mediator matching}: the $\gamma$-valid action whose
+        post-intervention mediators are closest to the advantaged reference
+        mediators, measured by the sum over mediators of the total variation
+        (categorical) or the $W_1$ distance divided by the width of
+        the mediator's bounds (continuous); ties are broken by cost.
+  \item \emph{Plausibility}: the cheapest $\gamma$-valid action whose
+        post-intervention mediators have a mean log-density under the fitted
+        mediator model, at the recipient's $(x,z)$, at least as high as that
+        of the recipient's factual mediators. Continuous mediators are scored
+        in the quantile-normal space in which the flow is trained.
+\end{itemize}
+
+\paragraph{Latent-confounding sensitivity.}
+Table~\ref{tab:app_confounding} uses a variant of German-Synth ($\kappa=1$)
+with a latent $U\sim\mathcal N(0,1)$. It sets $\Pr[X=1\mid U]=\sigma(\delta U)$
+and adds $\delta U$ to the latent mean of each ordinal mediator, for
+$\delta\in\{0,0.5,1,2\}$. $U$ does not enter the outcome. $Z$ is either age
+alone or age and a proxy $V=U+s\,\xi$ with $\xi\sim\mathcal N(0,1)$ and
+$s\in\{1,0.5,0.1\}$. For every setting and seed, the mediator model and
+classifiers are refitted on observed data, and actions are selected with the
+fitted model ($\gamma=0.5$, $\varepsilon=0.1$, at most 250 recipients). The
+true quantities come from the SCM. The interventional $\NIE$ and the reference
+$P(W_{x^{(1)}}\mid z)$ are computed with $U$ drawn from $p(U\mid z)$, using
+the same instances and $K$ as the fitted estimates. The true law of a
+selected action is computed with $U$ drawn from
+$p(U\mid x,z,\text{factual non-descendant mediators})$ by importance
+resampling (4{,}000 proposals), followed by 64 draws from the true mechanisms
+under the same clamping rules as $Q_a$.
 
 \subsection{Mediator Model Checkpoint Selection}
 \label{app:exp_checkpoint}

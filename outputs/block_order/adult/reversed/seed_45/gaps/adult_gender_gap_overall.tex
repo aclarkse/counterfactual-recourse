@@ -1,0 +1,14 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Classifier-scale mediation effects estimated by direct conditional sampling. TE is estimated directly; interaction is TE minus pure NDE minus pure NIE. Intervals hold the fitted flow and classifier fixed.}
+  \label{tab:adult_gap_overall}
+  \begin{tabular}{lccccc}
+    \toprule
+    Model & pure NDE & pure NIE & TE & interaction & $|\mathrm{NIE}/\mathrm{TE}|$ \\
+    \midrule
+    Logistic Reg. & $+0.1402\ [+0.1366,\ +0.1440]$ & $+0.0312\ [+0.0289,\ +0.0336]$ & $+0.1851\ [+0.1787,\ +0.1914]$ & $+0.0136\ [+0.0127,\ +0.0145]$ & 0.169 \\
+    MLP (64--32) & $+0.1372\ [+0.1304,\ +0.1441]$ & $+0.0235\ [+0.0219,\ +0.0250]$ & $+0.1790\ [+0.1700,\ +0.1881]$ & $+0.0184\ [+0.0172,\ +0.0195]$ & 0.131 \\
+    Random Forest & $+0.1292\ [+0.1237,\ +0.1348]$ & $+0.0229\ [+0.0214,\ +0.0245]$ & $+0.1616\ [+0.1542,\ +0.1692]$ & $+0.0095\ [+0.0086,\ +0.0103]$ & 0.142 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
